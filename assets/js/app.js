@@ -569,6 +569,18 @@ function openCart() {
     </aside>`);
 }
 
+function openMenu() {
+  const top = state.categories.filter((c) => !c.parent_id);
+  layerOpen(`<nav class="mnav" aria-label="Menú">
+    <button class="icon-btn" style="align-self:flex-end" aria-label="Cerrar menú" data-action="close-layer">${I.close}</button>
+    <a href="#/" data-action="close-layer">Inicio</a>
+    <a href="#/catalogo" data-action="close-layer">Catálogo</a>
+    ${top.map((c) => `<a href="#/catalogo/${esc(c.slug)}" data-action="close-layer" style="font-size:22px">${esc(c.name)}</a>`).join("")}
+    <a href="#/nosotros" data-action="close-layer" style="font-size:22px">Nosotros</a>
+    <a href="#/contacto" data-action="close-layer" style="font-size:22px">Contacto</a>
+  </nav>`);
+}
+
 function openAuth(mode = "login") {
   const f = 'width:100%;height:50px;border-radius:14px;border:0;background:var(--paper);color:var(--ink);padding:0 14px;font:inherit;margin-top:8px';
   const tab = (k, l) => `<button class="mono" data-action="auth-tab" data-mode="${k}" style="background:none;border:0;padding:8px 0;color:${mode === k ? "var(--ink)" : "var(--mute)"};border-bottom:2px solid ${mode === k ? "var(--red)" : "transparent"}">${l}</button>`;
@@ -608,6 +620,8 @@ function showMsg(form, text, isError = true) {
 // ---------------------------------------------------------------------------
 const actions = {
   "close-layer": () => closeLayer(),
+  "open-cart": () => openCart(),
+  "open-menu": () => openMenu(),
   "open-auth": () => openAuth("login"),
   "auth-tab": (el) => openAuth(el.dataset.mode),
   "toggle-mega": () => { state.megaOpen = !state.megaOpen; renderNav(currentRoute()); },
@@ -653,6 +667,12 @@ const actions = {
     if (!state.audio) {
       state.audio = new Audio();
       state.audio.addEventListener("ended", () => { state.playingId = null; paintPlayButtons(); });
+      state.audio.addEventListener("pause", paintPlayButtons);
+      state.audio.addEventListener("play", paintPlayButtons);
+      state.audio.addEventListener("timeupdate", () => {
+        const bar = document.getElementById("plProgress");
+        if (bar && state.audio.duration) bar.style.width = (state.audio.currentTime / state.audio.duration * 100) + "%";
+      });
     }
     if (state.playingId === p.id) {
       state.audio.pause();
@@ -694,7 +714,42 @@ function paintPlayButtons() {
     b.innerHTML = playing ? I.pause : I.play;
     b.setAttribute("aria-pressed", playing ? "true" : "false");
   });
+  syncPlayer();
 }
+
+// Barra inferior del reproductor: visible mientras hay una muestra cargada.
+function syncPlayer() {
+  const bar = document.getElementById("player");
+  if (!bar) return;
+  const p = state.products.find((x) => x.id === state.playingId);
+  const active = !!(p && state.audio && state.audio.src);
+  bar.classList.toggle("on", active);
+  document.body.classList.toggle("has-player", active);
+  if (!active) return;
+  const playing = !state.audio.paused && !state.audio.ended;
+  document.getElementById("plTitle").textContent = p.title;
+  const cover = document.getElementById("plCover");
+  cover.hidden = !p.coverUrl;
+  if (p.coverUrl) cover.src = p.coverUrl;
+  const btn = document.getElementById("plToggle");
+  btn.innerHTML = playing ? I.pause : I.play;
+  btn.setAttribute("aria-label", playing ? "Pausar muestra" : "Reproducir muestra");
+}
+
+function initPlayer() {
+  document.getElementById("plToggle")?.addEventListener("click", () => {
+    if (!state.audio || !state.playingId) return;
+    if (state.audio.paused) { state.audio.play().catch(() => toast("No se pudo reproducir")); }
+    else { state.audio.pause(); }
+    paintPlayButtons();
+  });
+  document.getElementById("plClose")?.addEventListener("click", () => {
+    if (state.audio) { state.audio.pause(); state.audio.removeAttribute("src"); }
+    state.playingId = null;
+    paintPlayButtons();
+  });
+}
+initPlayer();
 
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-action]");

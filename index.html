@@ -143,6 +143,7 @@ footer.site{margin-top:120px}
 @media (max-width:760px){.hero{grid-template-columns:1fr}.grid,.grid.cat3{grid-template-columns:1fr}.features{grid-template-columns:1fr}.process{grid-template-columns:1fr}.process ol{grid-template-columns:1fr}.pd{grid-template-columns:1fr}.fbox{grid-template-columns:1fr}.hrow{height:76px}.logo img{height:42px}.hact .btn{display:none}.ci{grid-template-columns:56px 1fr auto}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+<link rel="stylesheet" href="assets/css/store-theme.css">
 </head>
 <body>
 <header class="site" id="hdr">
@@ -170,6 +171,13 @@ footer.site{margin-top:120px}
     <div class="fbot mono"><span>© U3M — Urbano Beat Maker</span><span><a href="#/nosotros">Nosotros</a></span></div>
   </div>
 </footer>
+<div id="player" role="region" aria-label="Reproductor de muestras" aria-live="polite">
+  <img class="pl-cover" id="plCover" alt="" hidden>
+  <div class="pl-info"><b id="plTitle"></b><span>Muestra</span></div>
+  <button class="pl-btn" id="plToggle" aria-label="Pausar muestra"></button>
+  <button class="pl-close" id="plClose" aria-label="Cerrar reproductor"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  <div class="pl-bar"><span id="plProgress"></span></div>
+</div>
 <div id="layer"></div>
 <script type="module" src="assets/js/app.js"></script>
 </body>

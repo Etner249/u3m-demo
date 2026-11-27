@@ -136,11 +136,30 @@ insert into public.settings (key, value) values
     'image_path', null, 'button_label', 'Ver', 'button_url', '#/catalogo'))
 on conflict (key) do nothing;
 
+-- Pie de página e identidad visual (ajustes; sin tablas nuevas).
+insert into public.settings (key, value) values
+  ('footer', jsonb_build_object(
+    'description', 'Herramientas sonoras para gente que termina canciones.',
+    'links', jsonb_build_array(
+      jsonb_build_object('label','Catálogo completo','url','#/catalogo'),
+      jsonb_build_object('label','Drum Kits','url','#/catalogo/drum-kits'),
+      jsonb_build_object('label','Plugins','url','#/catalogo/plugins'),
+      jsonb_build_object('label','Contacto','url','#/contacto'),
+      jsonb_build_object('label','Términos y condiciones','url','#/legal/terminos'),
+      jsonb_build_object('label','Privacidad','url','#/legal/privacidad')),
+    'social', '[]'::jsonb,
+    'legal_text', '', 'copyright', '© U3M — Urbano Beat Maker')),
+  ('theme', jsonb_build_object(
+    'primary', '#e10600', 'secondary', '#ff3b30',
+    'background', '#0c0c0c', 'surface', '#1a1a1a', 'text', '#f5f5f5'))
+on conflict (key) do nothing;
+
 -- Lista blanca pública ampliada con las claves nuevas.
 drop policy if exists "settings_public_read" on public.settings;
 create policy "settings_public_read" on public.settings for select using (
   key in ('site_name', 'logo_path', 'currency', 'contact', 'social', 'banners',
-          'payment_methods', 'terms', 'privacy', 'about', 'team', 'promo', 'hero', 'menu_promo')
+          'payment_methods', 'terms', 'privacy', 'about', 'team', 'promo', 'hero', 'menu_promo',
+          'footer', 'theme', 'favicon_path')
   or public.has_role('admin')
 );
 

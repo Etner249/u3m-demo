@@ -1029,11 +1029,44 @@ async function render() {
   document.title = (route === "home" ? "" : `${first === "catalogo" ? "Catálogo" : first} — `) + "U3M — Urbano Beat Maker";
 }
 
+// Identidad visual y pie de página administrados desde el panel (settings: theme, favicon_path, footer).
+function applyBranding() {
+  const t = state.settings.theme ?? {};
+  const root = document.documentElement.style;
+  const vars = { primary: "--red", secondary: "--red2", background: "--paper", surface: "--smoke", text: "--ink" };
+  for (const [k, v] of Object.entries(vars)) if (/^#[0-9a-fA-F]{6}$/.test(t[k] ?? "")) root.setProperty(v, t[k]);
+  const fav = publicUrl("product-public", state.settings.favicon_path);
+  if (fav) {
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+    link.href = fav;
+  }
+  renderFooter();
+}
+
+function renderFooter() {
+  const f = state.settings.footer;
+  const wrap = document.querySelector("footer.site .wrap");
+  if (!f || !wrap) return; // sin ajustes, se conserva el pie original
+  const links = (Array.isArray(f.links) ? f.links : []).map((l) => `<li><a href="${esc(l.url)}">${esc(l.label)}</a></li>`).join("");
+  const social = (Array.isArray(f.social) ? f.social : []).map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.label)}</a></li>`).join("");
+  wrap.innerHTML = `
+    <div class="fbox">
+      <div><h3 class="display">${esc(f.description ?? "")}</h3></div>
+      <div><p class="mono" style="color:var(--mute)">Tienda</p><ul>${links}</ul></div>
+      <div><p class="mono" style="color:var(--mute)">Redes</p><ul>${social || '<li style="color:var(--mute)">—</li>'}</ul>
+        ${f.legal_text ? `<p class="note" style="margin-top:18px">${esc(f.legal_text)}</p>` : ""}</div>
+    </div>
+    <p class="display wordmark" aria-hidden="true">Urbano <span style="color:var(--red)">Beat</span> Maker</p>
+    <div class="fbot mono"><span>${esc(f.copyright ?? "")}</span><span><a href="#/nosotros">Nosotros</a></span></div>`;
+}
+
 async function boot() {
   if (!configured) { render(); return; }
   state.settings = await getSettings();
   const logo = publicUrl("product-public", state.settings.logo_path);
   if (logo) document.querySelector(".logo img").src = logo;
+  applyBranding();
   await loadCatalog();
   state.cms = await loadCms();
   const { data: { session } } = await sb.auth.getSession();

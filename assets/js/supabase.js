@@ -60,3 +60,51 @@ export async function getSettings() {
   settingsCache = out;
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Imágenes: validación, optimización y subida con progreso
+// ---------------------------------------------------------------------------
+export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+// Lanza un error legible si el archivo no es válido.
+export function validateImage(file, { maxMb = 8, types = IMAGE_TYPES } = {}) {
+  if (!file || !file.size) throw new Error("Selecciona una imagen.");
+  if (!types.includes(file.type)) throw new Error("Formato no permitido. Usa " + types.map((t) => t.split("/")[1].toUpperCase()).join(", ") + ".");
+  if (file.size > maxMb * 1048576) throw new Error(`La imagen supera ${maxMb} MB.`);
+}
+
+// Reduce el lado mayor a maxSide y convierte a WebP si ocupa menos. Si no mejora, devuelve el original.
+export async function optimizeImage(file, { maxSide = 2000, quality = 0.86 } = {}) {
+  if (file.type === "image/svg+xml" || file.type === "image/gif") return file;
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bmp.width * scale);
+  canvas.height = Math.round(bmp.height * scale);
+  canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close?.();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+  return blob && blob.size < file.size ? blob : file;
+}
+
+// Sube con XMLHttpRequest para reportar progreso. Usa el JWT del administrador: RLS decide.
+export async function uploadWithProgress(bucket, path, body, contentType, onProgress) {
+  const { data } = await sb.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Tu sesión caducó. Vuelve a iniciar sesión.");
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${CONFIG.SUPABASE_URL}/storage/v1/object/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("apikey", CONFIG.SUPABASE_ANON_KEY);
+    xhr.setRequestHeader("Content-Type", contentType);
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100)); };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) { onProgress?.(100); resolve(); }
+      else reject(new Error("La subida falló (" + xhr.status + ")."));
+    };
+    xhr.onerror = () => reject(new Error("Error de red al subir la imagen."));
+    xhr.send(body);
+  });
+}

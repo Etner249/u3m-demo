@@ -1,6 +1,6 @@
 // Contenido de la tienda (CMS): hero, secciones, banners, menú y categorías.
 // Todo se guarda en Supabase con RLS de administrador. Las imágenes van a product-public/site/.
-import { sb, errMsg, esc, publicUrl } from "../assets/js/supabase.js";
+import { sb, errMsg, esc, publicUrl, validateImage, optimizeImage, uploadWithProgress } from "../assets/js/supabase.js";
 
 const TYPES = {
   featured_products: "Productos destacados",
@@ -20,15 +20,50 @@ const toIso = (v) => (v ? new Date(v).toISOString() : null);
 const slugify = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
   .replace(/&/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-async function uploadSite(file, prefix) {
+// Barra de progreso flotante para cualquier subida del CMS.
+function progressBar(label) {
+  let el = document.getElementById("uploadBar");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "uploadBar";
+    el.setAttribute("role", "status");
+    el.style.cssText = "position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:90;background:#fff;color:#0b0b0c;border-radius:12px;padding:12px 16px;min-width:260px;box-shadow:0 14px 40px rgba(0,0,0,.4);font-weight:700;font-size:13px";
+    document.body.appendChild(el);
+  }
+  return {
+    set(pct) { el.innerHTML = `${esc(label)} · ${pct}%<div style="height:6px;background:#e5e5e5;border-radius:99px;margin-top:8px;overflow:hidden"><span style="display:block;height:100%;width:${pct}%;background:#e10600;transition:width .2s"></span></div>`; },
+    done() { el.remove(); },
+  };
+}
+
+// Valida, optimiza y sube una imagen del CMS con progreso. Devuelve la ruta o null si no hay archivo.
+async function uploadSite(file, prefix, maxMb = 8) {
   if (!file || !file.size) return null;
-  if (!file.type.startsWith("image/")) throw new Error("El archivo debe ser una imagen.");
-  if (file.size > 5 * 1048576) throw new Error("La imagen supera 5 MB.");
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const path = `site/${prefix}-${crypto.randomUUID()}.${ext}`;
-  const { error } = await sb.storage.from("product-public").upload(path, file, { contentType: file.type, upsert: false });
-  if (error) throw error;
-  return path;
+  validateImage(file, { maxMb });
+  const bar = progressBar("Optimizando y subiendo imagen");
+  try {
+    bar.set(0);
+    const blob = await optimizeImage(file, { maxSide: prefix.startsWith("favicon") ? 512 : 2000 });
+    const ext = blob.type === "image/webp" ? "webp" : (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const path = `site/${prefix}-${crypto.randomUUID()}.${ext}`;
+    await uploadWithProgress("product-public", path, blob, blob.type || file.type, (pct) => bar.set(pct));
+    return path;
+  } finally {
+    bar.done();
+  }
+}
+
+// Vista previa instantánea al elegir un archivo (sin subirlo todavía).
+export function cmsChange(input) {
+  if (input.type !== "file" || !input.dataset.preview) return false;
+  const img = document.getElementById(input.dataset.preview);
+  const file = input.files?.[0];
+  if (!img) return true;
+  try { validateImage(file, { maxMb: 8 }); }
+  catch (e) { input.value = ""; img.hidden = true; ctx?.toast?.(e.message); return true; }
+  img.src = URL.createObjectURL(file);
+  img.hidden = false;
+  return true;
 }
 
 async function getSetting(key) {
@@ -336,6 +371,133 @@ async function viewCategoryForm(id) {
 }
 
 // ---------------------------------------------------------------------------
+// Identidad visual: colores, fondos, logotipo y favicon
+// ---------------------------------------------------------------------------
+const THEME_FIELDS = [
+  ["primary", "Color principal (botones y acentos)"],
+  ["secondary", "Color secundario (hover y detalles)"],
+  ["background", "Fondo de la tienda"],
+  ["surface", "Fondo de tarjetas y paneles"],
+  ["text", "Color del texto"],
+];
+
+async function viewIdentity() {
+  const [theme, logo, favicon] = await Promise.all([getSetting("theme"), getSetting("logo_path"), getSetting("favicon_path")]);
+  const t = { primary: "#e10600", secondary: "#ff3b30", background: "#0c0c0c", surface: "#1a1a1a", text: "#f5f5f5", ...theme };
+  ctx.shell(`<p class="mono">Contenido de la tienda</p><h1>Identidad visual</h1>
+    <p class="note">Los colores se aplican a toda la tienda al recargarla. Los cambios no alteran la estructura del diseño.</p>
+    <div class="grid2" style="margin-top:18px">
+      <form class="card" data-submit="cms-theme" style="display:grid;gap:14px">
+        <h2>Colores</h2>
+        ${THEME_FIELDS.map(([k, label]) => `<label>${esc(label)}<input name="${k}" type="color" value="${esc(t[k])}"></label>`).join("")}
+        <div class="card" style="padding:14px;background:${esc(t.background)};color:${esc(t.text)}">
+          <span class="mono" style="color:${esc(t.text)}">Vista previa</span>
+          <p style="margin:8px 0"><b>Título de ejemplo</b></p>
+          <button type="button" style="background:${esc(t.primary)};color:#fff;border:0;border-radius:999px;padding:10px 18px;font-weight:800">Comprar</button>
+          <div style="background:${esc(t.surface)};border-radius:12px;padding:10px;margin-top:10px;color:${esc(t.text)}">Tarjeta</div>
+        </div>
+        <p class="field-err" data-err="form"></p>
+        <div class="row" style="justify-content:space-between"><button class="btn ghost" type="button" data-act="cms-theme-reset">Restaurar colores originales</button>
+          <button class="btn red" type="submit">Guardar colores</button></div>
+      </form>
+      <div style="display:grid;gap:18px;align-content:start">
+        <form class="card" data-submit="cms-logo" style="display:grid;gap:12px">
+          <h2>Logotipo</h2>
+          <div style="background:#0f0f0f;border-radius:14px;padding:16px;display:grid;place-items:center;min-height:90px">
+            <img id="logoPrev" src="${logo ? esc(publicUrl("product-public", logo)) : "../logo.png"}" alt="" style="max-height:70px"></div>
+          <input type="file" name="image" accept="image/png,image/jpeg,image/webp" data-preview="logoPrev">
+          <p class="note">PNG con fondo transparente recomendado. Máximo 8 MB; se optimiza al subir.</p>
+          <div class="row" style="justify-content:flex-end"><button class="btn red" type="submit">Subir logotipo</button></div>
+        </form>
+        <form class="card" data-submit="cms-favicon" style="display:grid;gap:12px">
+          <h2>Favicon</h2>
+          <div style="display:flex;gap:14px;align-items:center">
+            <img id="favPrev" src="${favicon ? esc(publicUrl("product-public", favicon)) : "../logo.png"}" alt="" width="48" height="48" style="border-radius:10px;background:#0f0f0f">
+            <span class="note">Imagen cuadrada de 512×512 px o mayor (PNG recomendado).</span></div>
+          <input type="file" name="image" accept="image/png,image/webp,image/jpeg" data-preview="favPrev">
+          <p class="field-err" data-err="form"></p>
+          <div class="row" style="justify-content:flex-end"><button class="btn red" type="submit">Subir favicon</button></div>
+        </form>
+      </div>
+    </div>`);
+}
+
+// ---------------------------------------------------------------------------
+// Pie de página: descripción, enlaces, redes, legal y copyright
+// ---------------------------------------------------------------------------
+const linesToPairs = (txt) => String(txt ?? "").split("\n").map((l) => l.trim()).filter(Boolean)
+  .map((l) => { const [label, ...rest] = l.split("|"); return { label: (label ?? "").trim(), url: rest.join("|").trim() }; })
+  .filter((p) => p.label && p.url);
+const pairsToLines = (arr) => (Array.isArray(arr) ? arr : []).map((p) => `${p.label} | ${p.url}`).join("\n");
+
+async function viewFooter() {
+  const f = await getSetting("footer");
+  ctx.shell(`<p class="mono">Contenido de la tienda</p><h1>Pie de página</h1>
+    <form class="card" data-submit="cms-footer" style="margin-top:18px;display:grid;gap:14px">
+      <label>Descripción<textarea name="description" rows="2" maxlength="300">${esc(f.description ?? "")}</textarea></label>
+      <div class="grid2">
+        <label>Enlaces (uno por línea: Texto | URL)<textarea name="links" rows="7">${esc(pairsToLines(f.links))}</textarea></label>
+        <label>Redes sociales (uno por línea: Red | URL)<textarea name="social" rows="7">${esc(pairsToLines(f.social))}</textarea></label>
+      </div>
+      <label>Información legal<textarea name="legal_text" rows="3" maxlength="600">${esc(f.legal_text ?? "")}</textarea></label>
+      <label>Copyright<input name="copyright" maxlength="160" value="${esc(f.copyright ?? "")}"></label>
+      <p class="field-err" data-err="form"></p>
+      <div class="row" style="justify-content:flex-end"><button class="btn red" type="submit">Guardar pie de página</button></div>
+    </form>`);
+}
+
+async function submitTheme(form) {
+  const fd = new FormData(form);
+  const theme = Object.fromEntries(THEME_FIELDS.map(([k]) => [k, String(fd.get(k) ?? "#000000")]));
+  await saveSetting("theme", theme);
+  ctx.toast("Colores guardados. Recarga la tienda para verlos."); ctx.render();
+}
+
+async function submitLogo(form) {
+  const path = await uploadSite(new FormData(form).get("image"), "logo", 8);
+  if (!path) return form.querySelector('[data-err="form"]')?.remove();
+  await saveSetting("logo_path", path);
+  ctx.toast("Logotipo actualizado"); ctx.render();
+}
+
+async function submitFavicon(form) {
+  const err = form.querySelector('[data-err="form"]');
+  const file = new FormData(form).get("image");
+  const path = await uploadSite(file, "favicon", 2);
+  if (!path) return;
+  await saveSetting("favicon_path", path);
+  ctx.toast("Favicon actualizado"); ctx.render();
+}
+
+async function submitFooter(form) {
+  const fd = new FormData(form);
+  await saveSetting("footer", {
+    description: String(fd.get("description") ?? "").trim(),
+    links: linesToPairs(fd.get("links")),
+    social: linesToPairs(fd.get("social")),
+    legal_text: String(fd.get("legal_text") ?? "").trim(),
+    copyright: String(fd.get("copyright") ?? "").trim(),
+  });
+  ctx.toast("Pie de página guardado"); ctx.render();
+}
+
+// ---------------------------------------------------------------------------
+// Destacados (productos marcados como destacados en la portada)
+// ---------------------------------------------------------------------------
+async function viewFeatured() {
+  const { data } = await sb.from("products").select("id, title, type, status, is_featured").order("title");
+  const n = (data ?? []).filter((p) => p.is_featured).length;
+  ctx.shell(`<div class="spread"><div><p class="mono">Contenido de la tienda</p><h1>Productos destacados</h1></div>
+      <span class="mono" data-featured-count>${n} de 8</span></div>
+    <p class="note">Se usan en las secciones automáticas de productos destacados. Máximo 8.</p>
+    <div class="card" style="margin-top:18px;padding:0;overflow:auto"><table>
+      <thead><tr><th>Destacado</th><th>Producto</th><th>Tipo</th><th>Estado</th></tr></thead>
+      <tbody>${(data ?? []).map((p) => `<tr><td><input type="checkbox" data-act="feature-toggle" data-id="${p.id}" ${p.is_featured ? "checked" : ""}></td>
+        <td>${esc(p.title)}</td><td>${esc(p.type)}</td><td>${p.status === "published" ? '<span class="st-published">Publicado</span>' : `<span class="st-draft">${esc(p.status)}</span>`}</td></tr>`).join("")
+        || `<tr><td colspan="4" class="mono">Sin productos.</td></tr>`}</tbody></table></div>`);
+}
+
+// ---------------------------------------------------------------------------
 // Ruteo y envío de formularios
 // ---------------------------------------------------------------------------
 export async function cmsRoute(parts, context) {
@@ -346,6 +508,9 @@ export async function cmsRoute(parts, context) {
   if (sub === "banners" && !id) return viewBanners();
   if (sub === "banners") return viewBannerForm(id);
   if (sub === "menu") return viewMenu();
+  if (sub === "identidad") return viewIdentity();
+  if (sub === "pie") return viewFooter();
+  if (sub === "destacados") return viewFeatured();
   if (sub === "categorias" && !id) return viewCategories();
   if (sub === "categorias") return viewCategoryForm(id);
   return ctx.shell(`<h1>No encontrado</h1>`);
@@ -497,6 +662,12 @@ async function submitCategory(form) {
 
 // Acciones del módulo (se registran en el manejador general del panel)
 export const cmsActs = {
+  "cms-theme-reset": async () => {
+    const ok = await ctx.confirmBox("¿Restaurar los colores originales de U3M?", "Restaurar");
+    if (!ok) return;
+    await saveSetting("theme", { primary: "#e10600", secondary: "#ff3b30", background: "#0c0c0c", surface: "#1a1a1a", text: "#f5f5f5" });
+    ctx.toast("Colores restaurados"); ctx.render();
+  },
   "cms-move": async (el) => {
     const table = el.dataset.table, id = el.dataset.id, dir = Number(el.dataset.dir);
     const orderCol = table === "nav_items" ? "sort_order" : "sort_order";
@@ -596,6 +767,7 @@ export async function cmsSubmit(kind, form) {
   const handlers = {
     "cms-hero": submitHero, "cms-section": submitSection, "cms-banner": submitBanner,
     "cms-nav": submitNav, "cms-menu-promo": submitMenuPromo, "cms-category": submitCategory,
+    "cms-theme": submitTheme, "cms-logo": submitLogo, "cms-favicon": submitFavicon, "cms-footer": submitFooter,
   };
   const fn = handlers[kind];
   if (!fn) return false;

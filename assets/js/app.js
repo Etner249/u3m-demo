@@ -487,8 +487,8 @@ async function viewOrder(id, query) {
   const ppToken = query.get("token");
   if (ppToken && order.status === "pending") {
     try {
-      await callFn("paypal-capture-order", { order_id: order.id, paypal_order_id: ppToken });
-      toast("Pago confirmado");
+      const r = await callFn("paypal-capture-order", { order_id: order.id, paypal_order_id: ppToken });
+      toast(r?.status === "manual_review" ? "Pago recibido: queda en revisión manual" : "Pago confirmado");
       return viewOrder(id, new URLSearchParams());
     } catch (e) {
       toast(e.message);

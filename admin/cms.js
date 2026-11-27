@@ -2,6 +2,14 @@
 // Todo se guarda en Supabase con RLS de administrador. Las imágenes van a product-public/site/.
 import { sb, errMsg, esc, publicUrl, validateImage, optimizeImage, uploadWithProgress } from "../assets/js/supabase.js";
 
+// Solo rutas internas (#/..., /...) y HTTP/HTTPS. Espeja la validación de la base de datos.
+export function urlError(u) {
+  const v = String(u ?? "").trim();
+  if (!v) return null;
+  if (/^(#\/|https?:\/\/)/i.test(v) || (/^\//.test(v) && !/^\/\//.test(v))) return null;
+  return "Enlace no permitido: usa una ruta interna (#/...) o una dirección http(s)://";
+}
+
 const TYPES = {
   featured_products: "Productos destacados",
   new_releases: "Nuevos lanzamientos",
@@ -471,6 +479,8 @@ async function submitFavicon(form) {
 
 async function submitFooter(form) {
   const fd = new FormData(form);
+  const bad = [...linesToPairs(fd.get("links")), ...linesToPairs(fd.get("social"))].find((p) => urlError(p.url));
+  if (bad) return ctx.toast(urlError(bad.url));
   await saveSetting("footer", {
     description: String(fd.get("description") ?? "").trim(),
     links: linesToPairs(fd.get("links")),
@@ -520,6 +530,8 @@ async function submitHero(form) {
   const fd = new FormData(form);
   const err = (m) => { form.querySelector('[data-err="form"]').textContent = m; };
   if (!String(fd.get("title") ?? "").trim()) return err("El título del hero es obligatorio.");
+  const badUrl = urlError(fd.get("button_url")) || urlError(fd.get("secondary_url"));
+  if (badUrl) return err(badUrl);
   const cur = await getSetting("hero");
   const image = (await uploadSite(fd.get("image"), "hero")) ?? cur.image_path ?? null;
   const mobile = (await uploadSite(fd.get("mobile_image"), "hero-mobile")) ?? cur.mobile_image_path ?? null;
@@ -540,6 +552,7 @@ async function submitSection(form) {
   const err = (m) => { form.querySelector('[data-err="form"]').textContent = m; };
   const name = String(fd.get("internal_name") ?? "").trim();
   if (!name) return err("El nombre interno es obligatorio.");
+  if (urlError(fd.get("button_url"))) return err(urlError(fd.get("button_url")));
   const limit = Number(fd.get("product_limit") ?? 4);
   if (!Number.isInteger(limit) || limit < 1 || limit > 12) return err("Entre 1 y 12 elementos.");
   const type = fd.get("section_type");
@@ -587,6 +600,7 @@ async function submitBanner(form) {
   const err = (m) => { form.querySelector('[data-err="form"]').textContent = m; };
   const title = String(fd.get("title") ?? "").trim();
   if (!title) return err("El título es obligatorio.");
+  if (urlError(fd.get("button_url"))) return err(urlError(fd.get("button_url")));
   const start = fd.get("starts_at") ? toIso(fd.get("starts_at")) : null;
   const end = fd.get("ends_at") ? toIso(fd.get("ends_at")) : null;
   if (start && end && new Date(end) <= new Date(start)) return err("La fecha de fin debe ser posterior al inicio.");
@@ -615,6 +629,7 @@ async function submitNav(form) {
   const label = String(fd.get("label") ?? "").trim();
   const url = String(fd.get("url") ?? "").trim();
   if (!label || !url) return err("Texto y destino son obligatorios.");
+  if (urlError(url)) return err(urlError(url));
   const { data: max } = await sb.from("nav_items").select("sort_order").order("sort_order", { ascending: false }).limit(1).maybeSingle();
   const { error } = await sb.from("nav_items").insert({
     label, url, category_id: fd.get("category_id") || null, parent_id: fd.get("parent_id") || null,
@@ -626,6 +641,7 @@ async function submitNav(form) {
 
 async function submitMenuPromo(form) {
   const fd = new FormData(form);
+  if (urlError(fd.get("button_url"))) return form.querySelector('[data-err="form"]').textContent = urlError(fd.get("button_url"));
   const cur = await getSetting("menu_promo");
   const image = (await uploadSite(fd.get("image"), "menu-promo")) ?? cur.image_path ?? null;
   await saveSetting("menu_promo", {

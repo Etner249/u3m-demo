@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Herramientas de carga para U3M. No se publican con la tienda.",
   "dependencies": {
+    "@electric-sql/pglite": "^0.2.17",
     "@supabase/supabase-js": "2.45.4"
   }
 }

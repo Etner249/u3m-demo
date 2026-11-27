@@ -3,6 +3,18 @@
 -- existente de settings a site_banners una sola vez.
 
 -- ---------------------------------------------------------------------------
+-- Validación de enlaces del CMS: solo rutas internas (#/ o /) y HTTP/HTTPS.
+-- Rechaza javascript:, data:, vbscript:, file: y cualquier otro esquema.
+-- Cadena vacía o NULL se consideran válidas (enlace no informado).
+-- ---------------------------------------------------------------------------
+create or replace function public.is_safe_url(u text)
+returns boolean language sql immutable as $$
+  select u is null or u = ''
+      or u ~* '^(#/|https?://)'
+      or (u ~ '^/' and u !~ '^//');
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Categorías: imagen, miniatura, color representativo y activación
 -- ---------------------------------------------------------------------------
 alter table public.categories
@@ -22,6 +34,7 @@ returns int language sql stable security definer set search_path = public as $$
   select count(*)::int from public.products
   where category_id = p_category and status <> 'archived';
 $$;
+revoke execute on function public.category_product_count(uuid) from public;
 grant execute on function public.category_product_count(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -40,7 +53,7 @@ create table if not exists public.site_sections (
   bg_color      text check (bg_color is null or bg_color ~ '^#[0-9a-fA-F]{6}$'),
   text_color    text check (text_color is null or text_color ~ '^#[0-9a-fA-F]{6}$'),
   button_label  text not null default '' check (length(button_label) <= 60),
-  button_url    text not null default '' check (length(button_url) <= 300),
+  button_url    text not null default '' check (length(button_url) <= 300 and public.is_safe_url(button_url)),
   product_limit smallint not null default 4 check (product_limit between 1 and 12),
   sort_order    integer not null default 0,
   is_active     boolean not null default true,
@@ -71,7 +84,7 @@ create table if not exists public.site_banners (
   image_path   text,
   bg_color     text check (bg_color is null or bg_color ~ '^#[0-9a-fA-F]{6}$'),
   button_label text not null default '' check (length(button_label) <= 60),
-  button_url   text not null default '' check (length(button_url) <= 300),
+  button_url   text not null default '' check (length(button_url) <= 300 and public.is_safe_url(button_url)),
   starts_at    timestamptz,
   ends_at      timestamptz,
   is_published boolean not null default false,
@@ -96,7 +109,7 @@ create table if not exists public.nav_items (
   id           uuid primary key default gen_random_uuid(),
   parent_id    uuid references public.nav_items(id) on delete cascade,
   label        text not null check (length(label) between 1 and 60),
-  url          text not null check (length(url) between 1 and 300),
+  url          text not null check (length(url) between 1 and 300 and public.is_safe_url(url)),
   category_id  uuid references public.categories(id) on delete set null,
   is_visible   boolean not null default true,
   is_protected boolean not null default false,
@@ -154,6 +167,34 @@ insert into public.settings (key, value) values
     'background', '#0c0c0c', 'surface', '#1a1a1a', 'text', '#f5f5f5'))
 on conflict (key) do nothing;
 
+-- Validación de URLs dentro de los ajustes JSON del CMS (hero, tarjeta del menú y pie).
+create or replace function public.validate_cms_settings()
+returns trigger language plpgsql as $$
+declare
+  u jsonb;
+begin
+  if new.key = 'hero' then
+    if not public.is_safe_url(new.value->>'button_url') or not public.is_safe_url(new.value->>'secondary_url') then
+      raise exception 'URL no permitida en el hero: usa rutas internas (#/...) o http(s)://';
+    end if;
+  elsif new.key = 'menu_promo' then
+    if not public.is_safe_url(new.value->>'button_url') then
+      raise exception 'URL no permitida en la tarjeta del menú: usa rutas internas (#/...) o http(s)://';
+    end if;
+  elsif new.key = 'footer' then
+    for u in select * from jsonb_array_elements(coalesce(new.value->'links', '[]'::jsonb)) loop
+      if not public.is_safe_url(u->>'url') then raise exception 'URL no permitida en los enlaces del pie'; end if;
+    end loop;
+    for u in select * from jsonb_array_elements(coalesce(new.value->'social', '[]'::jsonb)) loop
+      if not public.is_safe_url(u->>'url') then raise exception 'URL no permitida en las redes del pie'; end if;
+    end loop;
+  end if;
+  return new;
+end $$;
+drop trigger if exists settings_validate_cms on public.settings;
+create trigger settings_validate_cms before insert or update on public.settings
+  for each row execute function public.validate_cms_settings();
+
 -- Lista blanca pública ampliada con las claves nuevas.
 drop policy if exists "settings_public_read" on public.settings;
 create policy "settings_public_read" on public.settings for select using (
@@ -176,6 +217,7 @@ returns table (product_id uuid, units bigint) language sql stable security defin
   order by units desc
   limit greatest(1, least(p_limit, 24));
 $$;
+revoke execute on function public.best_seller_product_ids(int) from public;
 grant execute on function public.best_seller_product_ids(int) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -264,4 +306,5 @@ begin
       ))
     order by o.created_at desc;
 end $$;
+revoke execute on function public.admin_orphan_storage() from public;
 grant execute on function public.admin_orphan_storage() to authenticated;

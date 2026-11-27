@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
   if (unit?.reference_id !== orderId) return json(req, { error: "La referencia del pago no coincide" }, 409);
 
   const cents = Math.round(Number(capture.amount.value) * 100);
-  const { error } = await admin.rpc("fulfill_paypal_order", {
+  const { data: res, error } = await admin.rpc("fulfill_paypal_order", {
     p_paypal_order: paypalOrderId,
     p_capture_id: String(capture.id),
     p_amount_cents: cents,
@@ -55,5 +55,9 @@ Deno.serve(async (req) => {
   });
   if (error) return json(req, { error: "Pago verificado pero no registrado: " + error.message }, 409);
 
+  // La base decide: pago confirmado, o retenido para revisión manual (monto distinto o licencia agotada).
+  if (res?.status === "manual_review") {
+    return json(req, { order_id: orderId, status: "manual_review", reason: res.reason }, 202);
+  }
   return json(req, { order_id: orderId, status: "paid" });
 });

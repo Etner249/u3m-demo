@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
 
   // 3) Confirmación idempotente: si ya estaba aprobado, la función SQL no duplica nada.
   const admin = adminClient();
-  const { error } = await admin.rpc("fulfill_paypal_order", {
+  const { data: res, error } = await admin.rpc("fulfill_paypal_order", {
     p_paypal_order: paypalOrderId,
     p_capture_id: String(cap.id),
     p_amount_cents: Math.round(Number(cap.amount.value) * 100),
@@ -54,5 +54,5 @@ Deno.serve(async (req) => {
     // Otro error: PayPal reintenta con un código no 2xx.
     return new Response("No se pudo registrar: " + error.message, { status: 500 });
   }
-  return json(req, { ok: true });
+  return json(req, { ok: true, result: res?.status ?? null });
 });

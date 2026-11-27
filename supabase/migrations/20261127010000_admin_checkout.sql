@@ -171,6 +171,7 @@ begin
   end if;
   insert into public.product_plays (product_id, user_id) values (p_product, auth.uid());
 end $$;
+revoke execute on function public.record_play(uuid) from public;
 grant execute on function public.record_play(uuid) to anon, authenticated;
 
 create or replace function public.submit_contact(p_name text, p_email text, p_reason text, p_message text)
@@ -182,6 +183,7 @@ begin
   insert into public.contact_messages (name, email, reason, message)
   values (trim(p_name), trim(p_email), trim(p_reason), trim(p_message));
 end $$;
+revoke execute on function public.submit_contact(text, text, text, text) from public;
 grant execute on function public.submit_contact(text, text, text, text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -210,21 +212,24 @@ returns boolean language sql stable security definer set search_path = public as
       and f.bucket = 'product-private'
       and (
         public.has_role('admin')
-        or public.file_format(f.kind) = 'doc'
         or exists (
           select 1
           from public.issued_licenses il
           join public.license_types lt on lt.id = il.license_type_id
-          join public.orders o on o.id = (select oi.order_id from public.order_items oi where oi.id = il.order_item_id)
+          join public.order_items oi on oi.id = il.order_item_id
+          join public.orders o on o.id = oi.order_id
           where il.user_id = auth.uid()
             and il.product_id = f.product_id
             and il.revoked_at is null
             and o.status = 'paid'
-            and public.file_format(f.kind) = any (lt.formats)
+            -- Todo archivo privado exige licencia: el formato debe estar incluido.
+            -- Los documentos ('doc': manual y licencia) se incluyen en cualquier licencia.
+            and (public.file_format(f.kind) = 'doc' or public.file_format(f.kind) = any (lt.formats))
         )
       )
   );
 $$;
+revoke execute on function public.user_can_download(uuid) from public;
 grant execute on function public.user_can_download(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -257,15 +262,25 @@ begin
     if v_item.status <> 'published' then
       raise exception 'El producto "%" ya no está disponible', v_item.title;
     end if;
+    -- Bloqueo de la fila de licencia: serializa a los compradores simultáneos de la misma licencia.
     select pl.price_cents, pl.is_available, pl.max_sales into v_price, v_avail, v_max
     from public.product_licenses pl
-    where pl.product_id = v_item.product_id and pl.license_type_id = v_item.license_type_id;
+    where pl.product_id = v_item.product_id and pl.license_type_id = v_item.license_type_id
+    for update;
     if v_price is null or not v_avail then
       raise exception 'La licencia de "%" no está disponible', v_item.title;
     end if;
     if v_max is not null then
-      select count(*) into v_sold from public.issued_licenses
-      where product_id = v_item.product_id and license_type_id = v_item.license_type_id and revoked_at is null;
+      -- Emitidas + reservadas por pedidos pendientes de OTROS compradores (reserva de 30 minutos).
+      select (select count(*) from public.issued_licenses il
+               where il.product_id = v_item.product_id and il.license_type_id = v_item.license_type_id
+                 and il.revoked_at is null)
+           + (select count(*) from public.order_items oi
+               join public.orders o on o.id = oi.order_id
+              where oi.product_id = v_item.product_id and oi.license_type_id = v_item.license_type_id
+                and o.status = 'pending' and o.user_id <> v_user
+                and o.created_at > now() - interval '30 minutes')
+        into v_sold;
       if v_sold >= v_max then raise exception 'La licencia de "%" está agotada', v_item.title; end if;
     end if;
     v_subtotal := v_subtotal + v_price;
@@ -298,11 +313,12 @@ begin
 
   return v_order;
 end $$;
+revoke execute on function public.create_order_from_cart(text) from public;
 grant execute on function public.create_order_from_cart(text) to authenticated;
 
 -- Confirma un pedido: pedido pagado, licencias emitidas, carrito limpio.
 create or replace function public._fulfill_order(p_order uuid)
-returns void language plpgsql security definer set search_path = public as $$
+returns text language plpgsql security definer set search_path = public as $$
 declare
   v_order public.orders%rowtype;
   v_item record;
@@ -310,29 +326,37 @@ declare
   v_sold int;
 begin
   select * into v_order from public.orders where id = p_order for update;
-  if v_order.status = 'paid' then return; end if;
+  if v_order.status = 'paid' then return 'paid'; end if;
 
-  for v_item in
-    select oi.id, oi.product_id, oi.license_type_id from public.order_items oi where oi.order_id = p_order
-  loop
-    select max_sales into v_max from public.product_licenses
-    where product_id = v_item.product_id and license_type_id = v_item.license_type_id;
+  -- 1) Comprobar TODOS los artículos (con bloqueo) antes de escribir nada.
+  for v_item in select oi.product_id, oi.license_type_id from public.order_items oi where oi.order_id = p_order loop
+    select pl.max_sales into v_max from public.product_licenses pl
+    where pl.product_id = v_item.product_id and pl.license_type_id = v_item.license_type_id
+    for update;
     if v_max is not null then
       select count(*) into v_sold from public.issued_licenses
       where product_id = v_item.product_id and license_type_id = v_item.license_type_id and revoked_at is null;
-      if v_sold >= v_max then
-        raise exception 'Licencia agotada durante el pago: revisar manualmente';
-      end if;
-    end if;
-    insert into public.issued_licenses (order_item_id, user_id, product_id, license_type_id, license_code)
-    values (v_item.id, v_order.user_id, v_item.product_id, v_item.license_type_id,
-            'U3M-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 16)));
-    if v_max is not null and v_sold + 1 >= v_max then
-      update public.product_licenses set is_available = false
-      where product_id = v_item.product_id and license_type_id = v_item.license_type_id;
+      if v_sold >= v_max then return 'sold_out'; end if;
     end if;
   end loop;
 
+  -- 2) Emitir licencias.
+  for v_item in select oi.id, oi.product_id, oi.license_type_id from public.order_items oi where oi.order_id = p_order loop
+    insert into public.issued_licenses (order_item_id, user_id, product_id, license_type_id, license_code)
+    values (v_item.id, v_order.user_id, v_item.product_id, v_item.license_type_id,
+            'U3M-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 16)));
+  end loop;
+
+  -- 3) Agotar la disponibilidad cuando se llega al máximo.
+  update public.product_licenses pl set is_available = false
+  where pl.max_sales is not null
+    and exists (select 1 from public.order_items oi where oi.order_id = p_order
+                and oi.product_id = pl.product_id and oi.license_type_id = pl.license_type_id)
+    and (select count(*) from public.issued_licenses il
+         where il.product_id = pl.product_id and il.license_type_id = pl.license_type_id
+           and il.revoked_at is null) >= pl.max_sales;
+
+  -- 4) Carrito, estado y cupón.
   delete from public.cart_items ci
   where ci.user_id = v_order.user_id
     and exists (select 1 from public.order_items oi where oi.order_id = p_order and oi.product_id = ci.product_id);
@@ -342,41 +366,58 @@ begin
   if v_order.coupon_id is not null then
     update public.coupons set redemptions = redemptions + 1 where id = v_order.coupon_id;
   end if;
+  return 'paid';
 end $$;
 revoke all on function public._fulfill_order(uuid) from public, anon, authenticated;
 
 -- Pago PayPal ya capturado (llamado por la Edge Function con service role).
--- Reserva el pago pendiente creado al iniciar el pago y verifica monto y moneda.
+-- Devuelve jsonb con el estado. No lanza RAISE para montos distintos o licencias agotadas:
+-- en esos casos el pago queda en 'manual_review' y se conserva (no se revierte).
 create or replace function public.fulfill_paypal_order(p_paypal_order text, p_capture_id text,
                                                        p_amount_cents int, p_currency text, p_raw jsonb)
-returns uuid language plpgsql security definer set search_path = public as $$
+returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_pay public.payments%rowtype;
   v_order public.orders%rowtype;
+  v_res text;
 begin
   select * into v_pay from public.payments
   where provider = 'paypal' and provider_ref = p_paypal_order for update;
   if v_pay.id is null then raise exception 'Pago PayPal desconocido'; end if;
-  if v_pay.status = 'approved' then return v_pay.order_id; end if;
-
-  select * into v_order from public.orders where id = v_pay.order_id;
-  if v_order.status <> 'pending' then raise exception 'El pedido no está pendiente'; end if;
-  if p_amount_cents <> v_order.total_cents or upper(p_currency) <> upper(v_order.currency::text) then
-    update public.payments set status = 'manual_review', raw_event = p_raw where id = v_pay.id;
-    raise exception 'Monto o moneda no coinciden con el pedido';
+  if v_pay.status = 'approved' then
+    return jsonb_build_object('status', 'paid', 'order_id', v_pay.order_id, 'duplicate', true);
   end if;
+
+  select * into v_order from public.orders where id = v_pay.order_id for update;
+  if v_order.status <> 'pending' then raise exception 'El pedido no está pendiente'; end if;
   if exists (select 1 from public.payments where provider = 'paypal' and raw_event->>'capture_id' = p_capture_id) then
     raise exception 'Captura ya utilizada';
+  end if;
+
+  if p_amount_cents <> v_order.total_cents or upper(p_currency) <> upper(v_order.currency::text) then
+    update public.payments
+       set status = 'manual_review',
+           raw_event = p_raw || jsonb_build_object('capture_id', p_capture_id, 'reason', 'amount_mismatch',
+                                                   'received_cents', p_amount_cents, 'expected_cents', v_order.total_cents)
+     where id = v_pay.id;
+    return jsonb_build_object('status', 'manual_review', 'reason', 'amount_mismatch', 'order_id', v_order.id);
   end if;
 
   update public.payments
      set status = 'approved', verified_at = now(), amount_cents = p_amount_cents,
          raw_event = p_raw || jsonb_build_object('capture_id', p_capture_id)
    where id = v_pay.id;
-  perform public._fulfill_order(v_order.id);
-  return v_order.id;
+  v_res := public._fulfill_order(v_order.id);
+  if v_res = 'sold_out' then
+    update public.payments
+       set status = 'manual_review', raw_event = raw_event || jsonb_build_object('reason', 'sold_out')
+     where id = v_pay.id;
+    return jsonb_build_object('status', 'manual_review', 'reason', 'sold_out', 'order_id', v_order.id);
+  end if;
+  return jsonb_build_object('status', 'paid', 'order_id', v_order.id);
 end $$;
 revoke all on function public.fulfill_paypal_order(text, text, int, text, jsonb) from public, anon, authenticated;
+revoke execute on function public.fulfill_paypal_order(text, text, int, text, jsonb) from public;
 grant execute on function public.fulfill_paypal_order(text, text, int, text, jsonb) to service_role;
 
 -- Crea el pago PayPal pendiente al iniciar el checkout (llamado por la Edge Function con service role).
@@ -392,6 +433,7 @@ begin
   values (p_order, 'paypal', p_paypal_order, v_order.total_cents, v_order.currency, 'pending');
 end $$;
 revoke all on function public.register_paypal_attempt(uuid, uuid, text) from public, anon, authenticated;
+revoke execute on function public.register_paypal_attempt(uuid, uuid, text) from public;
 grant execute on function public.register_paypal_attempt(uuid, uuid, text) to service_role;
 
 -- Yape: el cliente envía el código de operación; queda en revisión manual.
@@ -407,6 +449,7 @@ begin
   insert into public.payments (order_id, provider, provider_ref, amount_cents, currency, status)
   values (p_order, 'yape', trim(p_operation_code), v_order.total_cents, v_order.currency, 'manual_review');
 end $$;
+revoke execute on function public.submit_yape_payment(uuid, text) from public;
 grant execute on function public.submit_yape_payment(uuid, text) to authenticated;
 
 -- Admin aprueba o rechaza un pago de Yape.
@@ -421,9 +464,11 @@ begin
     raise exception 'Pago no pendiente de revisión';
   end if;
   if p_approve then
+    if public._fulfill_order(v_pay.order_id) = 'sold_out' then
+      raise exception 'Licencia agotada: este pago no puede confirmarse automáticamente';
+    end if;
     update public.payments set status = 'approved', verified_at = now(), raw_event = jsonb_build_object('reviewed_by', auth.uid())
     where id = p_payment;
-    perform public._fulfill_order(v_pay.order_id);
   else
     update public.payments set status = 'rejected', raw_event = jsonb_build_object('reason', p_reason, 'reviewed_by', auth.uid())
     where id = p_payment;
@@ -432,6 +477,7 @@ begin
   values (auth.uid(), case when p_approve then 'payment.approve' else 'payment.reject' end,
           'payment', p_payment::text, jsonb_build_object('order_id', v_pay.order_id, 'reason', p_reason));
 end $$;
+revoke execute on function public.admin_review_yape(uuid, boolean, text) from public;
 grant execute on function public.admin_review_yape(uuid, boolean, text) to authenticated;
 
 -- Auditoría de archivos huérfanos: objetos en Storage sin fila en product_files.
@@ -450,6 +496,7 @@ begin
       )
     order by o.created_at desc;
 end $$;
+revoke execute on function public.admin_orphan_storage() from public;
 grant execute on function public.admin_orphan_storage() to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -497,7 +544,7 @@ insert into public.settings (key, value) values
   ('currency', '"USD"'),
   ('contact', '{"email":"","phone":"","hours":""}'),
   ('social', '{}'),
-  ('payment_methods', '{"paypal":true,"yape":false,"yape_number":"","yape_holder":""}'),
+  ('payment_methods', '{"paypal":false,"yape":false,"yape_number":"","yape_holder":""}'),
   ('terms', '""'),
   ('privacy', '""'),
   ('about', '""'),

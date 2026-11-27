@@ -1,0 +1,4 @@
+# Configuración de Supabase CLI para U3M.
+# El webhook de PayPal no envía JWT; su autenticidad se comprueba con la firma de PayPal.
+[functions.paypal-webhook]
+verify_jwt = false

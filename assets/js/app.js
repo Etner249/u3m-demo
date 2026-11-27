@@ -179,7 +179,7 @@ function notFound() {
 // Vistas públicas
 // ---------------------------------------------------------------------------
 function viewHome() {
-  const featured = state.products.filter((p) => p.is_featured).slice(0, 4);
+  const featured = state.products.filter((p) => p.is_featured).slice(0, 8);
   const news = state.products.filter((p) => !p.is_featured).slice(0, 8);
   const topCats = state.categories.filter((c) => !c.parent_id);
   const hero = featured[0] ?? state.products[0];
@@ -203,6 +203,8 @@ function viewHome() {
       <li><b>Pago verificado</b><span>Se valida en el servidor antes de habilitar la descarga.</span></li>
       <li class="hot"><b>Pago único</b><span>Sin suscripciones.</span></li>
     </ul>
+    ${bannersHtml()}
+    ${promoHtml()}
     ${featured.length ? `<section class="block"><div class="sh"><div><h2 class="display">Destacados</h2><span class="bar"></span></div><a href="#/catalogo">Ver todo →</a></div>${grid(featured)}</section>` : ""}
     ${topCats.length ? `<section class="block"><div class="sh"><div><h2 class="display">Por <span style="color:var(--red)">categoría</span></h2><span class="bar"></span></div></div>
       <div class="pills">${topCats.map((c, i) => `<a href="#/catalogo/${esc(c.slug)}" class="${i ? "" : "first"}">${esc(c.name)}</a>`).join("")}</div></section>` : ""}
@@ -214,6 +216,31 @@ function viewHome() {
       </ol></section>
     ${news.length ? `<section class="block"><div class="sh"><div><h2 class="display">Novedades</h2><span class="bar"></span></div><a href="#/catalogo">Catálogo →</a></div>${grid(news)}</section>` : ""}
   </div>`;
+}
+
+// Banners activos (gestionados desde Portada en el panel).
+function bannersHtml() {
+  const list = (Array.isArray(state.settings.banners) ? state.settings.banners : [])
+    .filter((b) => b.active && b.image_path)
+    .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+  if (!list.length) return "";
+  return `<section class="block" aria-label="Banners">${list.map((b) => `
+    <a href="${esc(b.link || "#/catalogo")}" class="card" style="display:block;padding:0;overflow:hidden;margin-bottom:16px;border-radius:var(--r-panel)">
+      <img src="${esc(publicUrl("product-public", b.image_path))}" alt="${esc(b.title ?? "")}" style="width:100%;max-height:360px;object-fit:cover">
+    </a>`).join("")}</section>`;
+}
+
+// Promoción destacada (gestionada desde Portada).
+function promoHtml() {
+  const p = state.settings.promo ?? {};
+  if (!p.active) return "";
+  const img = p.image_path ? publicUrl("product-public", p.image_path) : null;
+  return `<section class="block"><a href="${esc(p.link || "#/catalogo")}" class="process" style="grid-template-columns:${img ? "1fr 1fr" : "1fr"};align-items:center">
+    <div><span class="mono" style="color:var(--red2)">Promoción</span>
+      <h2 class="display" style="margin:12px 0 0;font-size:clamp(36px,4.6vw,56px)">${esc(p.title ?? "")}</h2>
+      <p class="note" style="font-size:17px;margin-top:14px">${esc(p.text ?? "")}</p></div>
+    ${img ? `<img src="${esc(img)}" alt="" style="width:100%;border-radius:22px;object-fit:cover">` : ""}
+  </a></section>`;
 }
 
 function viewCatalog(slug, query) {
@@ -800,6 +827,8 @@ async function render() {
 async function boot() {
   if (!configured) { render(); return; }
   state.settings = await getSettings();
+  const logo = publicUrl("product-public", state.settings.logo_path);
+  if (logo) document.querySelector(".logo img").src = logo;
   await loadCatalog();
   const { data: { session } } = await sb.auth.getSession();
   state.session = session;

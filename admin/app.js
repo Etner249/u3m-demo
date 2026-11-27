@@ -131,6 +131,7 @@ function shell(content) {
         ${link("productos/sample_pack", "Sample Packs")}
         ${link("productos/plugin", "Plugins")}
         ${link("taxonomia", "Categorías y etiquetas")}
+        ${link("portada", "Portada y destacados")}
         <div class="mono group">Ventas</div>
         ${link("pedidos", "Pedidos")}
         ${link("pagos", "Pagos")}
@@ -626,6 +627,91 @@ async function viewAudit() {
 // ---------------------------------------------------------------------------
 // Enrutado
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Portada: logotipo, banners, promoción y productos destacados
+// ---------------------------------------------------------------------------
+const MAX_FEATURED = 8;
+
+async function uploadSiteAsset(file, prefix) {
+  if (!file || file.size === 0) throw new Error("Selecciona una imagen.");
+  if (!file.type.startsWith("image/")) throw new Error("El archivo debe ser una imagen.");
+  if (file.size > 5 * 1048576) throw new Error("La imagen supera 5 MB.");
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `site/${prefix}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from("product-public").upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+async function saveSetting(key, value) {
+  const { error } = await sb.from("settings").upsert({
+    key, value, updated_by: state.session.user.id, updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+async function viewPortada() {
+  const [{ data: rows }, { data: prods }] = await Promise.all([
+    sb.from("settings").select("key, value").in("key", ["logo_path", "banners", "promo"]),
+    sb.from("products").select("id, title, type, status, is_featured").order("title"),
+  ]);
+  const s = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]));
+  const banners = Array.isArray(s.banners) ? s.banners : [];
+  const promo = s.promo ?? {};
+  const featuredCount = (prods ?? []).filter((p) => p.is_featured).length;
+  const img = (path) => (path ? publicUrl("product-public", path) : null);
+  const logo = img(s.logo_path);
+  shell(`<h1>Portada y destacados</h1>
+    <p class="note">Los cambios aparecen en la tienda al recargarla. Las imágenes van al bucket público.</p>
+
+    <div class="grid2" style="margin-top:18px">
+      <div class="card"><h2>Logotipo</h2>
+        <div style="margin:12px 0;background:#0f0f0f;border-radius:14px;padding:16px;display:grid;place-items:center;min-height:90px">
+          ${logo ? `<img src="${esc(logo)}" alt="Logotipo actual" style="max-height:70px">` : '<span class="mono">Usa el logotipo por defecto del sitio</span>'}</div>
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-site="logo">
+        <p class="note">PNG o SVG con fondo transparente recomendado.</p></div>
+
+      <div class="card"><h2>Promoción</h2>
+        <form data-submit="promo" style="display:grid;gap:12px;margin-top:12px">
+          ${promo.image_path ? `<img src="${esc(img(promo.image_path))}" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:14px">` : ""}
+          <label>Título<input name="title" maxlength="80" value="${esc(promo.title ?? "")}"></label>
+          <label>Texto<input name="text" maxlength="160" value="${esc(promo.text ?? "")}"></label>
+          <label>Enlace (ej. #/catalogo/soundbanks)<input name="link" maxlength="200" value="${esc(promo.link ?? "")}"></label>
+          <label>Imagen (opcional: deja vacío para conservar la actual)<input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+          <label class="chk"><input type="checkbox" name="active" ${promo.active ? "checked" : ""}> Mostrar en la portada</label>
+          <p class="field-err" data-err="form"></p>
+          <div class="row" style="justify-content:flex-end"><button class="btn red" type="submit">Guardar promoción</button></div>
+        </form></div>
+
+      <div class="card" style="grid-column:1/-1"><h2>Banners</h2>
+        <div class="card" style="padding:0;overflow:auto;margin-top:12px"><table>
+          <thead><tr><th>Imagen</th><th>Título</th><th>Enlace</th><th>Mostrar</th><th></th></tr></thead>
+          <tbody>${banners.map((b, i) => `<tr>
+            <td>${b.image_path ? `<img src="${esc(img(b.image_path))}" alt="" style="width:160px;height:56px;object-fit:cover;border-radius:10px">` : ""}</td>
+            <td>${esc(b.title ?? "")}</td><td class="mono">${esc(b.link ?? "")}</td>
+            <td><input type="checkbox" data-act="banner-toggle" data-index="${i}" ${b.active ? "checked" : ""}></td>
+            <td style="text-align:right"><button class="btn sm red" data-act="banner-del" data-index="${i}">Eliminar</button></td></tr>`).join("")
+            || `<tr><td colspan="5" class="mono">Sin banners.</td></tr>`}</tbody></table></div>
+        <form data-submit="banner" style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;margin-top:14px">
+          <label>Título<input name="title" required maxlength="80"></label>
+          <label>Enlace<input name="link" maxlength="200" placeholder="#/catalogo"></label>
+          <label>Imagen (JPG, PNG o WebP, máx. 5 MB)<input type="file" name="image" required accept="image/jpeg,image/png,image/webp"></label>
+          <button class="btn red" type="submit">Añadir banner</button>
+          <p class="field-err" data-err="form" style="grid-column:1/-1"></p>
+        </form></div>
+
+      <div class="card" style="grid-column:1/-1"><div class="spread"><h2>Productos destacados</h2>
+        <span class="mono" data-featured-count>${featuredCount} de ${MAX_FEATURED}</span></div>
+        <p class="note">Aparecen en la portada, en el orden alfabético de título. Máximo ${MAX_FEATURED}.</p>
+        <div class="card" style="padding:0;overflow:auto;margin-top:12px"><table>
+          <thead><tr><th>Destacado</th><th>Producto</th><th>Tipo</th><th>Estado</th></tr></thead>
+          <tbody>${(prods ?? []).map((p) => `<tr>
+            <td><input type="checkbox" data-act="feature-toggle" data-id="${p.id}" ${p.is_featured ? "checked" : ""}></td>
+            <td>${esc(p.title)}</td><td>${esc(TYPE_LABEL[p.type] ?? p.type)}</td><td>${badge(p.status)}</td></tr>`).join("")}</tbody></table></div>
+      </div>
+    </div>`);
+}
+
 async function render() {
   if (!configured) { root.innerHTML = `<div class="login"><div class="card"><h1>Panel sin configurar</h1><p>Falta la clave pública en <code>assets/js/config.js</code>.</p></div></div>`; return; }
   if (!state.session) return loginView();
@@ -637,6 +723,7 @@ async function render() {
     else if (parts[0] === "productos" && TYPES.includes(parts[1]) && parts[2]) await viewProductForm(parts[1], parts[2]);
     else if (parts[0] === "productos" && TYPES.includes(parts[1])) await viewProductList(parts[1]);
     else if (parts[0] === "taxonomia") await viewTaxonomy();
+    else if (parts[0] === "portada") await viewPortada();
     else if (parts[0] === "usuarios") await viewUsers();
     else if (parts[0] === "pedidos") await viewOrders();
     else if (parts[0] === "pagos") await viewPayments();
@@ -759,6 +846,39 @@ const acts = {
     const { error } = await sb.from("coupons").delete().eq("id", el.dataset.id);
     if (error) return fail(error);
     render();
+  },
+  "banner-toggle": async (el) => {
+    const { data } = await sb.from("settings").select("value").eq("key", "banners").maybeSingle();
+    const list = Array.isArray(data?.value) ? [...data.value] : [];
+    if (!list[Number(el.dataset.index)]) return;
+    list[Number(el.dataset.index)] = { ...list[Number(el.dataset.index)], active: el.checked };
+    try { await saveSetting("banners", list); toast("Banner actualizado"); } catch (e) { el.checked = !el.checked; fail(e); }
+  },
+  "banner-del": async (el) => {
+    const ok = await confirmBox("¿Eliminar este banner? Su imagen también se borrará del almacenamiento.", "Eliminar");
+    if (!ok) return;
+    const { data } = await sb.from("settings").select("value").eq("key", "banners").maybeSingle();
+    const list = Array.isArray(data?.value) ? [...data.value] : [];
+    const [removed] = list.splice(Number(el.dataset.index), 1);
+    if (!removed) return;
+    try {
+      await saveSetting("banners", list);
+      if (removed.image_path) await callFn("admin-delete", { storage_bucket: "product-public", storage_path: removed.image_path });
+      toast("Banner eliminado"); render();
+    } catch (e) { fail(e); }
+  },
+  "feature-toggle": async (el) => {
+    const on = el.checked;
+    if (on) {
+      const { count } = await sb.from("products").select("id", { count: "exact", head: true }).eq("is_featured", true);
+      if ((count ?? 0) >= MAX_FEATURED) { el.checked = false; return toast(`Máximo ${MAX_FEATURED} destacados`); }
+    }
+    const { error } = await sb.from("products").update({ is_featured: on }).eq("id", el.dataset.id);
+    if (error) { el.checked = !on; return fail(error); }
+    const { count } = await sb.from("products").select("id", { count: "exact", head: true }).eq("is_featured", true);
+    const counter = document.querySelector("[data-featured-count]");
+    if (counter) counter.textContent = `${count ?? 0} de ${MAX_FEATURED}`;
+    toast(on ? "Marcado como destacado" : "Quitado de destacados");
   },
   "msg-read": async (el) => {
     const { error } = await sb.from("contact_messages").update({ is_read: el.dataset.on === "1" }).eq("id", el.dataset.id);
@@ -908,6 +1028,38 @@ async function submitSettings(form) {
   toast("Configuración guardada");
 }
 
+async function submitBanner(form) {
+  const fd = new FormData(form);
+  const err = (m) => { form.querySelector('[data-err="form"]').textContent = m; };
+  const title = String(fd.get("title") ?? "").trim();
+  if (!title) return err("El título es obligatorio.");
+  const path = await uploadSiteAsset(fd.get("image"), "banner");
+  const { data } = await sb.from("settings").select("value").eq("key", "banners").maybeSingle();
+  const list = Array.isArray(data?.value) ? [...data.value] : [];
+  list.push({ id: crypto.randomUUID(), title, link: String(fd.get("link") ?? "").trim(), image_path: path, active: true, sort: list.length });
+  await saveSetting("banners", list);
+  toast("Banner añadido"); render();
+}
+
+async function submitPromo(form) {
+  const fd = new FormData(form);
+  const { data } = await sb.from("settings").select("value").eq("key", "promo").maybeSingle();
+  const cur = data?.value ?? {};
+  const file = fd.get("image");
+  const image_path = file && file.size > 0 ? await uploadSiteAsset(file, "promo") : (cur.image_path ?? null);
+  await saveSetting("promo", {
+    title: String(fd.get("title") ?? "").trim(), text: String(fd.get("text") ?? "").trim(),
+    link: String(fd.get("link") ?? "").trim(), image_path, active: fd.get("active") === "on",
+  });
+  toast("Promoción guardada"); render();
+}
+
+async function submitLogo(input) {
+  const path = await uploadSiteAsset(input.files[0], "logo");
+  await saveSetting("logo_path", path);
+  toast("Logotipo actualizado"); render();
+}
+
 async function submitCoupon(form) {
   const fd = new FormData(form);
   const kind = fd.get("kind");
@@ -948,6 +1100,8 @@ document.addEventListener("submit", async (e) => {
     else if (kind === "tax") await submitTaxonomy(form);
     else if (kind === "settings") await submitSettings(form);
     else if (kind === "coupon") await submitCoupon(form);
+    else if (kind === "banner") await submitBanner(form);
+    else if (kind === "promo") await submitPromo(form);
   } catch (err) {
     fail(err);
   } finally {
@@ -980,6 +1134,10 @@ document.addEventListener("change", async (e) => {
       toast("Archivo(s) subido(s)");
       render();
     } catch (err) { fail(err); bar.hidden = true; }
+    return;
+  }
+  if (el.dataset.site === "logo" && el.files.length) {
+    try { await submitLogo(el); } catch (err) { fail(err); }
     return;
   }
   if (el.dataset.change === "dash") {

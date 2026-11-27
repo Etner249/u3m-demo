@@ -444,6 +444,7 @@ begin
     select o.bucket_id::text, o.name::text, (o.metadata->>'size')::bigint, o.created_at
     from storage.objects o
     where o.bucket_id in ('product-public', 'product-private')
+      and o.name not like 'site/%'   -- logotipo, banners y promociones: se gestionan desde Portada
       and not exists (
         select 1 from public.product_files f where f.bucket = o.bucket_id and f.storage_path = o.name
       )

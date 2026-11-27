@@ -109,10 +109,25 @@ Pruebas que el responsable debe ejecutar en un entorno de pruebas (sandbox de Pa
 - [ ] Revisar la consola del navegador en la tienda y el panel.
 - [ ] Probar en móvil (la tienda conserva el diseño original).
 
+## 8b. Webhook de PayPal (confirmación de respaldo)
+- Función: `paypal-webhook`. Verifica la firma con la API de PayPal (`verify-webhook-signature`) y solo entonces confirma el pago (`PAYMENT.CAPTURE.COMPLETED`). Es idempotente.
+- Desplegar **sin JWT** (`supabase functions deploy paypal-webhook --no-verify-jwt`; `supabase/config.toml` ya lo indica).
+- Secreto requerido: `PAYPAL_WEBHOOK_ID` (el ID del webhook creado en el panel de desarrolladores de PayPal).
+- Registrar en PayPal la URL: `https://<ref>.supabase.co/functions/v1/paypal-webhook`, con el evento `Payment capture completed`.
+- Lo configura el titular de la cuenta PayPal. Nunca se usan credenciales del desarrollador.
+
+## 8c. Portada, logotipo, banners y destacados
+Desde **Portada y destacados** en el panel: logotipo, promoción (título, texto, enlace, imagen, activa), banners (imagen, enlace, activos, eliminables) y hasta 8 productos destacados. Las imágenes se guardan en `site/` del bucket público.
+
+## 8d. Administrador temporal de desarrollo
+1. Crear en Authentication → Users un usuario de **prueba** (correo de prueba, nunca el personal del desarrollador).
+2. En el SQL Editor: `select public.bootstrap_first_admin('<correo de prueba>');`
+3. Al entregar: quitar ese usuario o su rol (`admin_set_role` desde el panel) y asignar el administrador definitivo con el mismo procedimiento del punto 5.
+
 ## 9. Pendiente y limitaciones reales
 - **No probado en vivo**: el código se verificó por sintaxis y en una carga sin configurar. Falta la prueba de extremo a extremo con un proyecto Supabase y PayPal sandbox.
-- **Webhook de PayPal**: no implementado. La captura desde el retorno de la tienda sí está. Si el cliente cierra la pestaña tras pagar, el pedido queda pendiente y debe confirmarse con un webhook (pendiente).
-- **Logotipo y banners**: el logotipo es fijo en el sitio; los banners y promociones aún no se gestionan desde el panel.
+- **Webhook de PayPal**: implementado (sección 8b), pendiente de prueba con PayPal sandbox.
+- **Portada**: implementada (sección 8c), pendiente de prueba en vivo.
 - **Catálogo original**: el sitio original no tenía beats, solo otros productos. El panel sí gestiona beats.
 - **Precios de la migración**: el sitio original mostraba Basic/Pro/Unlimited con multiplicadores. Se migran como básica (x1), premium WAV (x2.5) y ilimitada (x4). La exclusiva no se importó.
 - **Portadas**: dos productos del original no tenían imagen en el repositorio; quedan sin portada hasta subirla.

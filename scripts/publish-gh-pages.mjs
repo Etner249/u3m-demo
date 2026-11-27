@@ -19,7 +19,10 @@ const dryRun = process.argv.includes("--dry-run");
 // Solo por decisión explícita del propietario: publicar con el catálogo todavía vacío.
 const allowEmptyCatalog = process.argv.includes("--allow-empty-catalog");
 
-const sh = (cmd, opts = {}) => execSync(cmd, { cwd: ROOT, stdio: opts.quiet ? "pipe" : "inherit", encoding: "utf8", ...opts }).trim();
+const sh = (cmd, opts = {}) => {
+  const out = execSync(cmd, { cwd: ROOT, stdio: opts.quiet ? "pipe" : "inherit", encoding: "utf8", ...opts });
+  return typeof out === "string" ? out.trim() : "";
+};
 const fail = (m) => { console.error("\nNO PUBLICADO: " + m); process.exit(1); };
 
 // 1) Compuertas

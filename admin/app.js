@@ -1,6 +1,7 @@
 // Panel administrativo U3M. La seguridad real está en RLS y en las funciones SQL / Edge Functions;
 // este código solo muestra y envía lo que la base permite.
 import { sb, configured, errMsg, esc, money, publicUrl, TYPE_LABEL, STATUS_LABEL } from "../assets/js/supabase.js";
+import { cmsRoute, cmsActs, cmsSubmit } from "./cms.js";
 import { Chart } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/+esm";
 
 const root = document.getElementById("root");
@@ -119,7 +120,7 @@ function loginView(message = "") {
 // Estructura
 // ---------------------------------------------------------------------------
 function shell(content) {
-  const link = (h, label) => `<a href="#/${h}" class="${state.route === h.split("/")[0] ? "on" : ""}">${label}</a>`;
+  const link = (h, label) => `<a href="#/${h}" class="${(location.hash || "").startsWith("#/" + h) ? "on" : ""}">${label}</a>`;
   root.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand"><img src="../logo.png" alt=""><span class="mono">Panel</span></div>
@@ -130,8 +131,13 @@ function shell(content) {
         ${link("productos/drum_kit", "Drum Kits")}
         ${link("productos/sample_pack", "Sample Packs")}
         ${link("productos/plugin", "Plugins")}
-        ${link("taxonomia", "Categorías y etiquetas")}
-        ${link("portada", "Portada y destacados")}
+        <div class="mono group">Contenido de la tienda</div>
+        ${link("contenido/inicio", "Página de inicio")}
+        ${link("contenido/banners", "Banners")}
+        ${link("contenido/menu", "Menú de navegación")}
+        ${link("contenido/categorias", "Categorías")}
+        ${link("portada", "Logotipo y destacados")}
+        ${link("taxonomia", "Géneros y etiquetas")}
         <div class="mono group">Ventas</div>
         ${link("pedidos", "Pedidos")}
         ${link("pagos", "Pagos")}
@@ -724,6 +730,7 @@ async function render() {
     else if (parts[0] === "productos" && TYPES.includes(parts[1])) await viewProductList(parts[1]);
     else if (parts[0] === "taxonomia") await viewTaxonomy();
     else if (parts[0] === "portada") await viewPortada();
+    else if (parts[0] === "contenido") await cmsRoute(parts, { shell, toast, fail, confirmBox, render, userId: state.session.user.id });
     else if (parts[0] === "usuarios") await viewUsers();
     else if (parts[0] === "pedidos") await viewOrders();
     else if (parts[0] === "pagos") await viewPayments();
@@ -886,6 +893,8 @@ const acts = {
     render();
   },
 };
+
+Object.assign(acts, cmsActs);
 
 function couponForm() {
   modal(`<h2>Nuevo cupón</h2>
@@ -1102,6 +1111,7 @@ document.addEventListener("submit", async (e) => {
     else if (kind === "coupon") await submitCoupon(form);
     else if (kind === "banner") await submitBanner(form);
     else if (kind === "promo") await submitPromo(form);
+    else if (kind.startsWith("cms-")) await cmsSubmit(kind, form);
   } catch (err) {
     fail(err);
   } finally {

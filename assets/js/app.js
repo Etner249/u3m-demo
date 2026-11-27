@@ -1,6 +1,7 @@
 // Tienda U3M: catálogo, ficha, carrito, pedidos, pagos y cuenta del cliente.
 // Todo el contenido sale de Supabase. No hay datos de demostración.
 import { sb, configured, errMsg, publicUrl, esc, money, TYPE_LABEL, STATUS_LABEL, getSettings } from "./supabase.js";
+import { loadCms, navTree } from "./cms.js";
 
 const I = {
   play: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>',
@@ -13,7 +14,8 @@ const I = {
 const state = {
   session: null, uid: null, settings: {}, categories: [], products: [],
   cart: [], favorites: new Set(), audio: null, playingId: null,
-  recovery: false, megaOpen: false, renderId: 0,
+  recovery: false, megaOpen: false, megaNav: null, renderId: 0,
+  cms: { nav: [], sections: [], banners: [], bestIds: [] },
 };
 
 const app = document.getElementById("app");
@@ -178,7 +180,117 @@ function notFound() {
 // ---------------------------------------------------------------------------
 // Vistas públicas
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Inicio dirigido por el CMS (hero, banners y secciones en el orden del panel)
+// ---------------------------------------------------------------------------
+const HERO_SVG = `<svg viewBox="0 0 400 400" width="100%" height="100%" aria-hidden="true"><circle cx="200" cy="200" r="190" fill="none" stroke="#0c0c0c" stroke-width="1.5" opacity=".2"/><circle cx="200" cy="200" r="150" fill="none" stroke="#0c0c0c" stroke-width="1.5" opacity=".35"/><circle cx="200" cy="200" r="110" fill="none" stroke="#0c0c0c" stroke-width="1.5" opacity=".55"/><circle cx="200" cy="200" r="70" fill="#0c0c0c"/><circle cx="200" cy="200" r="24" fill="#e10600"/><path d="M60 300 C 120 220, 150 330, 210 250 S 300 170, 350 120" fill="none" stroke="#e10600" stroke-width="6" stroke-linecap="round"/></svg>`;
+
+function heroHtml(h) {
+  const fg = h.text_color || "#0c0c0c";
+  const img = h.image_path ? publicUrl("product-public", h.image_path) : null;
+  const mob = h.mobile_image_path ? publicUrl("product-public", h.mobile_image_path) : null;
+  const art = img || mob
+    ? `<picture><source media="(max-width:760px)" srcset="${esc(mob ?? img)}"><img src="${esc(img ?? mob)}" alt="" style="width:100%;border-radius:24px;object-fit:cover"></picture>`
+    : HERO_SVG;
+  return `<section class="hero" style="background:${esc(h.bg_color || "#ffffff")};color:${esc(fg)}" aria-labelledby="ht"><div>
+      ${h.eyebrow ? `<p class="mono" style="color:${esc(fg)};opacity:.7;margin:0 0 20px">${esc(h.eyebrow)}</p>` : ""}
+      <h1 id="ht" class="display">${esc(h.title ?? "")}</h1>
+      <span class="bar" style="margin:28px 0"></span>
+      <p class="lead" style="color:${esc(fg)};opacity:.85">${esc(h.subtitle ?? "")}</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${h.button_label ? `<a class="btn btn-dark" href="${esc(h.button_url || "#/catalogo")}">${esc(h.button_label)} ${I.arrow}</a>` : ""}
+        ${h.secondary_label ? `<a class="btn btn-red" href="${esc(h.secondary_url || "#/catalogo")}">${esc(h.secondary_label)}</a>` : ""}
+      </div></div>
+    <div class="hero-art">${art}</div></section>`;
+}
+
+function bannerHtml(b) {
+  const img = b.image_path ? publicUrl("product-public", b.image_path) : null;
+  const style = `${b.bg_color ? `background:${esc(b.bg_color)};` : ""}${img ? `background-image:url('${esc(img)}');background-size:cover;background-position:center;` : ""}`;
+  return `<section class="block"><a class="banner-cms" href="${esc(b.button_url || "#/catalogo")}" style="${style}">
+    <div>${b.eyebrow ? `<span class="chip" style="background:#fff;color:#0c0c0c">${esc(b.eyebrow)}</span>` : ""}
+      <h2 class="display">${esc(b.title)}</h2>
+      ${b.description ? `<p class="note" style="color:#fff;font-size:16px;max-width:520px">${esc(b.description)}</p>` : ""}
+      ${b.button_label ? `<span class="btn btn-red" style="margin-top:16px">${esc(b.button_label)} ${I.arrow}</span>` : ""}</div>
+  </a></section>`;
+}
+
+// Productos de una sección: manual si hay elementos; si no, automático por tipo.
+function productsFor(sec) {
+  const items = (sec.site_section_items ?? []).filter((i) => i.product_id).sort((a, b) => a.position - b.position);
+  let list;
+  if (items.length) list = items.map((i) => state.products.find((p) => p.id === i.product_id)).filter(Boolean);
+  else if (sec.section_type === "featured_products") list = state.products.filter((p) => p.is_featured);
+  else if (sec.section_type === "new_releases") list = state.products;
+  else if (sec.section_type === "best_sellers") list = state.cms.bestIds.map((id) => state.products.find((p) => p.id === id)).filter(Boolean);
+  else list = [];
+  return list.slice(0, sec.product_limit ?? 4);
+}
+
+function sectionHtml(sec) {
+  const fg = sec.text_color ? `color:${esc(sec.text_color)};` : "";
+  const style = `${sec.bg_color ? `background:${esc(sec.bg_color)};` : ""}${fg}`;
+  const head = sec.title || sec.subtitle || sec.button_label ? `<div class="sh"><div>
+      ${sec.title ? `<h2 class="display" style="${fg}">${esc(sec.title)}</h2>` : ""}
+      ${sec.subtitle ? `<p class="note" style="margin:12px 0 0">${esc(sec.subtitle)}</p>` : ""}
+      <span class="bar"></span></div>
+    ${sec.button_label ? `<a href="${esc(sec.button_url || "#/catalogo")}">${esc(sec.button_label)} →</a>` : ""}</div>` : "";
+  const img = sec.image_path ? publicUrl("product-public", sec.image_path) : null;
+  const body = sec.description ? `<p style="font-size:18px;line-height:1.6;color:var(--soft);${fg}">${esc(sec.description)}</p>` : "";
+
+  switch (sec.section_type) {
+    case "featured_products":
+    case "new_releases":
+    case "best_sellers":
+    case "collection": {
+      const list = productsFor(sec);
+      return list.length ? `<section class="block" style="${style}">${head}${grid(list)}</section>` : "";
+    }
+    case "featured_categories": {
+      const cats = (sec.site_section_items ?? []).filter((i) => i.category_id).sort((a, b) => a.position - b.position)
+        .map((i) => state.categories.find((c) => c.id === i.category_id)).filter(Boolean).slice(0, sec.product_limit ?? 8);
+      if (!cats.length) return "";
+      return `<section class="block" style="${style}">${head}<div class="cat-cards">${cats.map((c) => {
+        const thumb = c.thumb_path || c.image_path;
+        return `<a class="cat-card" href="#/catalogo/${esc(c.slug)}" style="${c.color ? `background:${esc(c.color)}` : ""}">
+          ${thumb ? `<img src="${esc(publicUrl("product-public", thumb))}" alt="">` : ""}
+          <b class="display">${esc(c.name)}</b></a>`;
+      }).join("")}</div></section>`;
+    }
+    case "promo_banner":
+      return `<section class="block"><a class="promo-block" href="${esc(sec.button_url || "#/catalogo")}" style="${style}${img ? `background-image:url('${esc(img)}');background-size:cover;background-position:center;` : ""}">
+        <div>${sec.subtitle ? `<span class="mono">${esc(sec.subtitle)}</span>` : ""}
+          <h2 class="display">${esc(sec.title)}</h2>${body}
+          ${sec.button_label ? `<span class="btn btn-light" style="margin-top:14px">${esc(sec.button_label)}</span>` : ""}</div></a></section>`;
+    case "image_text":
+      return `<section class="block image-text" style="${style}">
+        ${img ? `<img src="${esc(img)}" alt="" style="width:100%;border-radius:var(--r-panel);object-fit:cover;aspect-ratio:4/3">` : ""}
+        <div>${head}${body}</div></section>`;
+    case "editorial":
+    default:
+      return `<section class="block process" style="${style}grid-template-columns:1fr">
+        <div>${head}${body}</div></section>`;
+  }
+}
+
 function viewHome() {
+  if (!state.cms.nav.length && !state.cms.sections.length) return viewHomeLegacy();
+  const h = state.settings.hero ?? {};
+  return `${h.active === false ? "" : `<div class="wrap">${heroHtml(h)}</div>`}
+    <div class="wrap">
+    <ul class="features" style="padding:0" aria-label="Ventajas">
+      <li><b>Descarga tras el pago</b><span>Enlaces temporales al confirmar la compra.</span></li>
+      <li><b>Licencias por producto</b><span>Cada producto ofrece sus niveles.</span></li>
+      <li><b>Formato por archivo</b><span>Según la ficha de cada producto.</span></li>
+      <li><b>Pago verificado</b><span>Se valida en el servidor antes de habilitar la descarga.</span></li>
+      <li class="hot"><b>Pago único</b><span>Sin suscripciones.</span></li>
+    </ul>
+    ${state.cms.banners.map(bannerHtml).join("")}
+    ${state.cms.sections.map(sectionHtml).join("")}
+    </div>`;
+}
+
+function viewHomeLegacy() {
   const featured = state.products.filter((p) => p.is_featured).slice(0, 8);
   const news = state.products.filter((p) => !p.is_featured).slice(0, 8);
   const topCats = state.categories.filter((c) => !c.parent_id);
@@ -521,18 +633,50 @@ function accountSecurity() {
 // ---------------------------------------------------------------------------
 // Layout: cabecera, menú, carrito, login
 // ---------------------------------------------------------------------------
-function renderNav(route) {
-  const links = [["#/", "Inicio", route === "home"], ["#/catalogo", "Catálogo", route === "catalog"]];
-  document.getElementById("nav").innerHTML = links.map(([h, l, a], i) =>
-    `<a href="${h}" class="${a && !state.megaOpen ? "active" : ""}">${l}</a>` +
-    (i === 1 ? `<button aria-expanded="${state.megaOpen}" aria-controls="mega" class="${state.megaOpen ? "active" : ""}" data-action="toggle-mega">Categorías ${I.chev}</button>` : "")
-  ).join("") + `<a href="#/nosotros" class="${route === "about" ? "active" : ""}">Nosotros</a><a href="#/contacto" class="${route === "contact" ? "active" : ""}">Contacto</a>`;
+// Menú: lo administra el CMS (nav_items). Si aún no existe, se usa el menú original.
+function isActiveUrl(url) {
+  const h = location.hash || "#/";
+  return url === "#/" ? (h === "#/" || h === "#") : h.startsWith(url);
+}
 
-  const top = state.categories.filter((c) => !c.parent_id);
-  document.getElementById("megaInner").innerHTML = top.map((c) =>
-    `<a class="cat" href="#/catalogo/${esc(c.slug)}"><b>${esc(c.name)}</b><span>${esc(c.description ?? "")}</span></a>`).join("") +
-    `<a class="cat all" href="#/catalogo"><span>Ver todo el catálogo</span><span style="color:var(--red2)">→</span></a>`;
-  document.getElementById("mega").hidden = !state.megaOpen;
+function renderNav(route) {
+  const tree = navTree(state.cms.nav);
+  const navEl = document.getElementById("nav");
+  const open = state.megaOpen ? state.megaNav : null;
+  if (tree.length) {
+    navEl.innerHTML = tree.map((t) => t.children.length
+      ? `<button aria-expanded="${open === t.id}" aria-controls="mega" class="${open === t.id ? "active" : ""}" data-action="toggle-mega" data-nav="${t.id}">${esc(t.label)} ${I.chev}</button>`
+      : `<a href="${esc(t.url)}" class="${isActiveUrl(t.url) && !open ? "active" : ""}">${esc(t.label)}</a>`
+    ).join("");
+  } else {
+    const links = [["#/", "Inicio"], ["#/catalogo", "Catálogo"]];
+    navEl.innerHTML = links.map(([h, l]) => `<a href="${h}" class="${isActiveUrl(h) && !state.megaOpen ? "active" : ""}">${l}</a>`).join("") +
+      `<button aria-expanded="${state.megaOpen}" aria-controls="mega" class="${state.megaOpen ? "active" : ""}" data-action="toggle-mega">Categorías ${I.chev}</button>` +
+      `<a href="#/nosotros" class="${route === "about" ? "active" : ""}">Nosotros</a><a href="#/contacto" class="${route === "contact" ? "active" : ""}">Contacto</a>`;
+  }
+
+  const parent = tree.find((t) => t.id === open);
+  const megaEl = document.getElementById("megaInner");
+  if (parent) {
+    megaEl.innerHTML = parent.children.map((c) => {
+      const cat = c.category_id ? state.categories.find((x) => x.id === c.category_id) : null;
+      const href = cat ? `#/catalogo/${esc(cat.slug)}` : esc(c.url);
+      return `<a class="cat" href="${href}"><b>${esc(c.label)}</b><span>${esc(cat?.description ?? "")}</span></a>`;
+    }).join("") + `<a class="cat all" href="#/catalogo"><span>Ver todo el catálogo</span><span style="color:var(--red2)">→</span></a>`;
+  } else {
+    const top = state.categories.filter((c) => !c.parent_id);
+    megaEl.innerHTML = top.map((c) =>
+      `<a class="cat" href="#/catalogo/${esc(c.slug)}"><b>${esc(c.name)}</b><span>${esc(c.description ?? "")}</span></a>`).join("") +
+      `<a class="cat all" href="#/catalogo"><span>Ver todo el catálogo</span><span style="color:var(--red2)">→</span></a>`;
+  }
+  const promo = state.settings.menu_promo ?? {};
+  if (promo.active && (parent || !tree.length)) {
+    megaEl.innerHTML += `<a class="promo" href="${esc(promo.button_url || "#/catalogo")}"${promo.image_path ? ` style="background-image:url('${esc(publicUrl("product-public", promo.image_path))}');background-size:cover;background-position:center"` : ""}>
+      <span class="mono">${esc(promo.eyebrow ?? "")}</span><span><b class="display" style="display:block;font-size:30px">${esc(promo.title ?? "")}</b>
+      <span style="display:block;margin-top:8px;color:#fff">${esc(promo.description ?? "")}</span>
+      <span class="btn" style="background:#fff;color:#0c0c0c;height:44px;margin-top:14px">${esc(promo.button_label || "Ver")} ${I.arrow}</span></span></a>`;
+  }
+  document.getElementById("mega").hidden = !(state.megaOpen && (parent || !tree.length));
 
   const acc = document.getElementById("accountBtn");
   acc.textContent = state.session ? "Mi cuenta" : "Entrar";
@@ -625,7 +769,12 @@ const actions = {
   "open-menu": () => openMenu(),
   "open-auth": () => openAuth("login"),
   "auth-tab": (el) => openAuth(el.dataset.mode),
-  "toggle-mega": () => { state.megaOpen = !state.megaOpen; renderNav(currentRoute()); },
+  "toggle-mega": (el) => {
+    const id = el.dataset.nav ?? "legacy";
+    state.megaOpen = !(state.megaOpen && state.megaNav === id);
+    state.megaNav = id;
+    renderNav(currentRoute());
+  },
   logout: async () => { await sb.auth.signOut(); toast("Sesión cerrada"); location.hash = "#/"; },
   "add-to-cart": async (el) => {
     if (!requireLogin()) return;
@@ -886,6 +1035,7 @@ async function boot() {
   const logo = publicUrl("product-public", state.settings.logo_path);
   if (logo) document.querySelector(".logo img").src = logo;
   await loadCatalog();
+  state.cms = await loadCms();
   const { data: { session } } = await sb.auth.getSession();
   state.session = session;
   state.uid = session?.user?.id ?? null;

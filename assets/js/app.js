@@ -414,9 +414,10 @@ function viewProduct(slug) {
 
 function viewContact() {
   const c = state.settings.contact ?? {};
+  const cp = state.settings.contact_page ?? {};
   const hasInfo = !!(c.email || c.phone || c.hours);
   const f = 'width:100%;height:52px;border-radius:16px;border:0;background:var(--paper);color:var(--ink);padding:0 16px;font:inherit;margin-top:8px';
-  return `<div class="wrap"><div class="ph"><p class="mono" style="color:var(--mute)">Inicio / Contacto</p><h1 class="display">Hablemos.</h1><span class="bar"></span></div>
+  return `<div class="wrap"><div class="ph"><p class="mono" style="color:var(--mute)">Inicio / Contacto</p><h1 class="display">${esc(cp.title || "Hablemos.")}</h1><span class="bar"></span>${cp.description ? `<p style="color:var(--mute);margin-top:18px;max-width:640px">${esc(cp.description)}</p>` : ""}</div>
   <div style="display:grid;gap:32px;grid-template-columns:${hasInfo ? "minmax(0,1.3fr) minmax(0,1fr)" : "minmax(0,1fr)"};margin:48px 0 96px">
     <form data-form="contact" style="background:var(--smoke);border-radius:28px;padding:clamp(24px,4vw,44px);display:grid;gap:18px">
       <label class="mono" style="color:var(--mute)">Tu nombre<input name="name" required maxlength="120" style="${f}"></label>
@@ -434,9 +435,10 @@ function viewContact() {
 }
 
 function viewAbout() {
+  const ap = state.settings.about_page ?? {};
   const paras = String(state.settings.about ?? "").split(/\n\s*\n/).filter(Boolean);
   const team = Array.isArray(state.settings.team) ? state.settings.team : [];
-  return `<div class="wrap"><div class="ph"><p class="mono" style="color:var(--mute)">Inicio / Nosotros</p><h1 class="display">Nosotros</h1><span class="bar"></span></div>
+  return `<div class="wrap"><div class="ph"><p class="mono" style="color:var(--mute)">Inicio / Nosotros</p><h1 class="display">${esc(ap.title || "Nosotros")}</h1><span class="bar"></span>${ap.description ? `<p style="color:var(--mute);margin-top:18px;max-width:640px">${esc(ap.description)}</p>` : ""}</div>
   ${team.length ? `<h2 class="mono" style="color:var(--mute);margin:48px 0 20px">El equipo</h2>
   <div style="display:grid;gap:24px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">${team.map((m) => `
     <article class="card"><img src="${esc(publicUrl("product-public", m.photo_path) ?? "")}" alt="${esc(m.name)}" style="width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:16px">

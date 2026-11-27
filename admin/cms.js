@@ -134,6 +134,7 @@ async function viewHome() {
         <td>${badgeOn(s.is_active)}</td>
         <td class="row" style="justify-content:flex-end">
           <a class="btn sm" href="#/contenido/inicio/${s.id}">Editar</a>
+          <button class="btn sm ${s.is_active ? "" : "ok"}" data-act="cms-section-toggle" data-id="${s.id}" data-on="${s.is_active ? 0 : 1}">${s.is_active ? "Ocultar" : "Activar"}</button>
           <button class="btn sm" data-act="cms-duplicate" data-id="${s.id}">Duplicar</button>
           <button class="btn sm red" data-act="cms-section-del" data-id="${s.id}" data-name="${esc(s.internal_name)}">Eliminar</button></td></tr>`).join("")
         || `<tr><td colspan="5" class="mono">Aún no hay secciones. Crea la primera.</td></tr>`}</tbody></table></div>`);
@@ -220,6 +221,7 @@ async function viewBanners() {
         <td class="row" style="justify-content:flex-end">
           <button class="btn sm ghost" data-act="cms-move" data-table="site_banners" data-id="${b.id}" data-dir="-1" ${i === 0 ? "disabled" : ""}>↑</button>
           <button class="btn sm ghost" data-act="cms-move" data-table="site_banners" data-id="${b.id}" data-dir="1" ${i === arr.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="btn sm" data-act="cms-banner-dup" data-id="${b.id}">Duplicar</button>
           <button class="btn sm ${b.is_published ? "" : "ok"}" data-act="cms-banner-publish" data-id="${b.id}" data-on="${b.is_published ? 0 : 1}">${b.is_published ? "Ocultar" : "Publicar"}</button>
           <button class="btn sm red" data-act="cms-banner-del" data-id="${b.id}" data-name="${esc(b.title)}">Eliminar</button></td></tr>`).join("")
         || `<tr><td colspan="6" class="mono">Sin banners todavía.</td></tr>`}</tbody></table></div>`);
@@ -510,6 +512,99 @@ async function viewFeatured() {
 // ---------------------------------------------------------------------------
 // Ruteo y envío de formularios
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Nosotros y contacto: títulos, textos y equipo (ajustes: about_page, contact_page, about, team)
+// ---------------------------------------------------------------------------
+const textSetting = (v) => (typeof v === "string" ? v : "");
+async function getTeam() {
+  const { data } = await sb.from("settings").select("value").eq("key", "team").maybeSingle();
+  return Array.isArray(data?.value) ? data.value : [];
+}
+const saveTeam = (list) => saveSetting("team", list);
+const teamPhoto = (path) => (path ? `<img src="${esc(publicUrl("product-public", path))}" alt="" style="width:72px;height:90px;object-fit:cover;border-radius:10px">` : `<span class="mono">Sin foto</span>`);
+
+async function viewPages() {
+  const [aboutPage, contactPage, about, team] = await Promise.all([
+    getSetting("about_page"), getSetting("contact_page"), getSetting("about"), getTeam(),
+  ]);
+  const ap = aboutPage && typeof aboutPage === "object" ? aboutPage : {};
+  const cp = contactPage && typeof contactPage === "object" ? contactPage : {};
+  ctx.shell(`<div class="spread"><div><p class="mono">Contenido de la tienda</p><h1>Nosotros y contacto</h1></div>
+      <a class="btn" href="../#/nosotros" target="_blank" rel="noopener">Ver página Nosotros</a></div>
+    <form class="card" data-submit="cms-pages" style="margin-top:18px;display:grid;gap:16px">
+      <h2>Página Nosotros</h2>
+      <label>Título<input name="about_title" maxlength="120" value="${esc(ap.title ?? "")}" placeholder="Nosotros"></label>
+      <label>Descripción breve<textarea name="about_description" rows="2" maxlength="400">${esc(ap.description ?? "")}</textarea></label>
+      <label>Historia (párrafos separados por línea en blanco)<textarea name="about" rows="6">${esc(textSetting(about))}</textarea></label>
+      <h2>Página Contacto</h2>
+      <label>Título<input name="contact_title" maxlength="120" value="${esc(cp.title ?? "")}" placeholder="Hablemos."></label>
+      <label>Descripción breve<textarea name="contact_description" rows="2" maxlength="400">${esc(cp.description ?? "")}</textarea></label>
+      <p class="mono">Correo, teléfono y horario se editan en Configuración general.</p>
+      <p class="field-err" data-err="form"></p>
+      <div class="row" style="justify-content:flex-end"><button class="btn red" type="submit">Guardar páginas</button></div>
+    </form>
+    <div class="spread" style="margin-top:36px"><div><h2>Equipo</h2><p class="mono">Aparece en la página Nosotros, en el orden de esta lista.</p></div>
+      <a class="btn red" href="#/contenido/paginas/equipo/nuevo">Agregar integrante</a></div>
+    <div class="card" style="margin-top:18px;padding:0;overflow:auto"><table>
+      <thead><tr><th>Foto</th><th>Nombre</th><th>Rol</th><th></th></tr></thead>
+      <tbody>${team.map((m, i, arr) => `<tr>
+        <td>${teamPhoto(m.photo_path)}</td>
+        <td><a href="#/contenido/paginas/equipo/${i}"><b>${esc(m.name)}</b></a></td>
+        <td>${esc(m.role || "—")}</td>
+        <td class="row" style="justify-content:flex-end">
+          <button class="btn sm ghost" data-act="cms-team-move" data-idx="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button>
+          <button class="btn sm ghost" data-act="cms-team-move" data-idx="${i}" data-dir="1" ${i === arr.length - 1 ? "disabled" : ""} aria-label="Bajar">↓</button>
+          <a class="btn sm" href="#/contenido/paginas/equipo/${i}">Editar</a>
+          <button class="btn sm red" data-act="cms-team-del" data-idx="${i}" data-name="${esc(m.name)}">Eliminar</button></td></tr>`).join("")
+        || `<tr><td colspan="4" class="mono">Aún no hay integrantes. Agrega el primero.</td></tr>`}</tbody></table></div>`);
+}
+
+async function viewTeamForm(idx) {
+  const team = await getTeam();
+  const isNew = idx === "nuevo";
+  const i = isNew ? -1 : Number(idx);
+  const m = isNew ? { name: "", role: "" } : team[i];
+  if (!isNew && !m) return ctx.shell(`<h1>No encontrado</h1>`);
+  ctx.shell(`<div class="spread"><div><p class="mono"><a href="#/contenido/paginas">Nosotros y contacto</a> / Integrante</p><h1>${isNew ? "Nuevo integrante" : esc(m.name)}</h1></div></div>
+    <form class="card" data-submit="cms-team" data-id="${isNew ? "" : i}" style="margin-top:18px;display:grid;gap:14px">
+      <label>Nombre<input name="name" required maxlength="80" value="${esc(m.name ?? "")}"></label>
+      <label>Rol<input name="role" maxlength="80" value="${esc(m.role ?? "")}" placeholder="Productor · Beatmaker"></label>
+      <div>${m.photo_path ? `<img src="${esc(publicUrl("product-public", m.photo_path))}" alt="" style="width:160px;aspect-ratio:4/5;object-fit:cover;border-radius:12px">` : `<span class="mono">Sin foto</span>`}</div>
+      <label>Nueva foto (JPG, PNG o WEBP; se optimiza al subir)<input type="file" name="photo" accept="image/*" data-preview="team-photo-prev"></label>
+      <img id="team-photo-prev" alt="" hidden style="width:160px;aspect-ratio:4/5;object-fit:cover;border-radius:12px">
+      <p class="field-err" data-err="form"></p>
+      <div class="row" style="justify-content:space-between">
+        ${isNew ? "<span></span>" : `<button type="button" class="btn red" data-act="cms-team-del" data-idx="${i}" data-name="${esc(m.name)}">Eliminar</button>`}
+        <button class="btn red" type="submit">Guardar integrante</button></div>
+    </form>`);
+}
+
+async function submitPages(form) {
+  const fd = new FormData(form);
+  const err = (m) => { form.querySelector('[data-err="form"]').textContent = m; };
+  if (String(fd.get("about_title") ?? "").length > 120 || String(fd.get("contact_title") ?? "").length > 120) return err("Los títulos no pueden superar 120 caracteres.");
+  await saveSetting("about_page", { title: String(fd.get("about_title") ?? "").trim(), description: String(fd.get("about_description") ?? "").trim() });
+  await saveSetting("contact_page", { title: String(fd.get("contact_title") ?? "").trim(), description: String(fd.get("contact_description") ?? "").trim() });
+  await saveSetting("about", String(fd.get("about") ?? ""));
+  ctx.toast("Páginas guardadas"); ctx.render();
+}
+
+async function submitTeam(form) {
+  const fd = new FormData(form);
+  const err = (m) => { form.querySelector('[data-err="form"]').textContent = m; };
+  const name = String(fd.get("name") ?? "").trim();
+  if (!name) return err("El nombre es obligatorio.");
+  const team = await getTeam();
+  const idx = form.dataset.id === "" ? -1 : Number(form.dataset.id);
+  const current = idx >= 0 ? team[idx] : null;
+  const photo = await uploadSite(fd.get("photo"), "team", 8);
+  const item = { name, role: String(fd.get("role") ?? "").trim(), photo_path: photo ?? current?.photo_path ?? null };
+  if (idx >= 0) team[idx] = item; else team.push(item);
+  await saveTeam(team);
+  ctx.toast("Integrante guardado");
+  location.hash = "#/contenido/paginas";
+}
+
 export async function cmsRoute(parts, context) {
   ctx = { ...ctx, ...context };
   const [, sub, id] = parts; // parts[0] === "contenido"
@@ -518,6 +613,8 @@ export async function cmsRoute(parts, context) {
   if (sub === "banners" && !id) return viewBanners();
   if (sub === "banners") return viewBannerForm(id);
   if (sub === "menu") return viewMenu();
+  if (sub === "paginas" && id === "equipo") return viewTeamForm(parts[3]);
+  if (sub === "paginas") return viewPages();
   if (sub === "identidad") return viewIdentity();
   if (sub === "pie") return viewFooter();
   if (sub === "destacados") return viewFeatured();
@@ -678,6 +775,38 @@ async function submitCategory(form) {
 
 // Acciones del módulo (se registran en el manejador general del panel)
 export const cmsActs = {
+  "cms-team-move": async (el) => {
+    const team = await getTeam();
+    const i = Number(el.dataset.idx), j = i + Number(el.dataset.dir);
+    if (i < 0 || j < 0 || j >= team.length) return;
+    [team[i], team[j]] = [team[j], team[i]];
+    await saveTeam(team);
+    ctx.render();
+  },
+  "cms-team-del": async (el) => {
+    const ok = await ctx.confirmBox(`¿Quitar a "${el.dataset.name}" del equipo?`, "Eliminar");
+    if (!ok) return;
+    const team = await getTeam();
+    team.splice(Number(el.dataset.idx), 1);
+    await saveTeam(team);
+    ctx.toast("Integrante eliminado");
+    location.hash = "#/contenido/paginas";
+  },
+  "cms-section-toggle": async (el) => {
+    const { error } = await sb.from("site_sections").update({ is_active: el.dataset.on === "1" }).eq("id", el.dataset.id);
+    if (error) return ctx.fail(error);
+    ctx.render();
+  },
+  "cms-banner-dup": async (el) => {
+    const { data: b } = await sb.from("site_banners").select("*").eq("id", el.dataset.id).maybeSingle();
+    if (!b) return;
+    const { data: max } = await sb.from("site_banners").select("sort_order").order("sort_order", { ascending: false }).limit(1).maybeSingle();
+    const { id, created_at, updated_at, ...rest } = b;
+    const { error } = await sb.from("site_banners").insert({ ...rest, title: `${b.title} (copia)`, is_published: false, sort_order: (max?.sort_order ?? 0) + 10 });
+    if (error) return ctx.fail(error);
+    ctx.toast("Banner duplicado (oculto hasta que lo revises)");
+    ctx.render();
+  },
   "cms-theme-reset": async () => {
     const ok = await ctx.confirmBox("¿Restaurar los colores originales de U3M?", "Restaurar");
     if (!ok) return;
@@ -784,6 +913,7 @@ export async function cmsSubmit(kind, form) {
     "cms-hero": submitHero, "cms-section": submitSection, "cms-banner": submitBanner,
     "cms-nav": submitNav, "cms-menu-promo": submitMenuPromo, "cms-category": submitCategory,
     "cms-theme": submitTheme, "cms-logo": submitLogo, "cms-favicon": submitFavicon, "cms-footer": submitFooter,
+    "cms-pages": submitPages, "cms-team": submitTeam,
   };
   const fn = handlers[kind];
   if (!fn) return false;

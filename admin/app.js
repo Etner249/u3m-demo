@@ -138,6 +138,7 @@ function shell(content) {
         ${link("contenido/categorias", "Categorías")}
         ${link("contenido/identidad", "Identidad visual")}
         ${link("contenido/pie", "Pie de página")}
+        ${link("contenido/paginas", "Nosotros y contacto")}
         ${link("contenido/destacados", "Destacados")}
         ${link("taxonomia", "Géneros y etiquetas")}
         <div class="mono group">Ventas</div>

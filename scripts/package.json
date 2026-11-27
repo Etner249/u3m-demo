@@ -1,0 +1,9 @@
+{
+  "name": "u3m-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Herramientas de carga para U3M. No se publican con la tienda.",
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4"
+  }
+}

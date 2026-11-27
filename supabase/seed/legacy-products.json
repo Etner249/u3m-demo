@@ -1,0 +1,42 @@
+{
+  "_nota": "Datos extraídos del array P del index.html original (22 productos, no 24). Precio base en US$. Licencias: básica x1, premium WAV x2.5, ilimitada x4. La exclusiva no se ofrece hasta que el cliente la configure.",
+  "categories": [
+    { "slug": "sample-packs", "name": "Sample Packs", "description": "One-shots, loops y stems en 24-bit WAV", "parent": null },
+    { "slug": "drill", "name": "UK & NY Drill", "description": "", "parent": "sample-packs" },
+    { "slug": "trap", "name": "Modern Trap", "description": "", "parent": "sample-packs" },
+    { "slug": "synthwave-retro", "name": "Synthwave & Retro", "description": "", "parent": "sample-packs" },
+    { "slug": "drum-kits", "name": "Drum Kits", "description": "808s, kicks, snares y percusiones", "parent": null },
+    { "slug": "synth-presets", "name": "Synth Presets", "description": "Soundbanks para Serum y Vital", "parent": null },
+    { "slug": "serum-soundbanks", "name": "Xfer Serum", "description": "", "parent": "synth-presets" },
+    { "slug": "vital-presets", "name": "Vital", "description": "", "parent": "synth-presets" },
+    { "slug": "midi-kits", "name": "MIDI & Melody Kits", "description": "Progresiones, toplines y armonías", "parent": null },
+    { "slug": "plugins", "name": "Plugins (VST / AU)", "description": "Efectos y sintes para Win y Mac", "parent": null },
+    { "slug": "daw-templates", "name": "DAW Templates", "description": "FL Studio, Ableton Live y Logic Pro", "parent": null },
+    { "slug": "stems", "name": "Stems & Acapellas", "description": "Pistas aisladas para remix", "parent": null },
+    { "slug": "soundbanks", "name": "Soundbanks", "description": "Diseño sonoro y soundscapes", "parent": null }
+  ],
+  "products": [
+    { "n": 1,  "cat": "drill",            "title": "Night Shift: London Drill Kit",      "genre": "Drill",       "bpm": 144, "key": "D Minor",  "format": "WAV (24-bit) + MIDI",   "base": 29.99, "featured": true,  "summary": "Slides de 808, hi-hats en tresillo y melodías oscuras de cuerdas." },
+    { "n": 2,  "cat": "drill",            "title": "Brooklyn Smoke Vol. 2",              "genre": "Drill",       "bpm": 140, "key": "G Minor",  "format": "WAV (24-bit) + MIDI",   "base": 24.99, "featured": false, "summary": "Loops de piano y coros cortados para drill neoyorquino." },
+    { "n": 3,  "cat": "trap",             "title": "Selva de Concreto: Trap Latino",     "genre": "Trap",        "bpm": 136, "key": "A Minor",  "format": "WAV (24-bit) + MIDI",   "base": 27.99, "featured": true,  "summary": "Flautas, guitarras y percusión latina sobre baterías de trap." },
+    { "n": 4,  "cat": "trap",             "title": "Ice Cold Melodies",                  "genre": "Trap",        "bpm": 150, "key": "F# Minor", "format": "WAV (24-bit)",          "base": 19.99, "featured": false, "summary": "Campanas, plucks y pads fríos para trap melódico." },
+    { "n": 5,  "cat": "synthwave-retro",  "title": "Miami 1986: Retro Drums",            "genre": "Synthwave",   "bpm": 108, "key": "E Minor",  "format": "WAV (24-bit)",          "base": 21.99, "featured": false, "summary": "Cajas de ritmo ochenteras con reverb gated y toms electrónicos." },
+    { "n": 6,  "cat": "synthwave-retro",  "title": "Outrun Arpeggios",                   "genre": "Synthwave",   "bpm": 116, "key": "C Minor",  "format": "WAV + MIDI",            "base": 18.99, "featured": false, "summary": "Arpegios analógicos y bajos secuenciados listos para usar." },
+    { "n": 7,  "cat": "drum-kits",        "title": "Amazonas 808 Drum Kit",              "genre": "Trap",        "bpm": null, "key": null,      "format": "WAV (24-bit)",          "base": 24.99, "featured": true,  "summary": "808s afinados, kicks contundentes y percusión orgánica de la selva." },
+    { "n": 8,  "cat": "drum-kits",        "title": "Perreo Supremo: Reggaetón Drums",    "genre": "Reggaetón",   "bpm": 95,  "key": null,      "format": "WAV (24-bit)",          "base": 22.99, "featured": false, "summary": "Dembow, rimshots y fills listos para reggaetón y dancehall." },
+    { "n": 9,  "cat": "serum-soundbanks", "title": "Dark Matter: Serum Bank",            "genre": "Electrónica", "bpm": null, "key": null,      "format": "Serum .fxp + Wavetables", "base": 26.99, "featured": false, "summary": "Bajos reese, leads distorsionados y pads oscuros con macros." },
+    { "n": 10, "cat": "serum-soundbanks", "title": "Latin Keys para Serum",              "genre": "Reggaetón",   "bpm": null, "key": null,      "format": "Serum .fxp",            "base": 19.99, "featured": false, "summary": "Pianos, marimbas y plucks pensados para urbano latino." },
+    { "n": 11, "cat": "vital-presets",    "title": "Vital Essentials: Urbano",           "genre": "Trap",        "bpm": null, "key": null,      "format": "Vital .vital",          "base": 14.99, "featured": false, "summary": "808s, campanas y leads listos para Vital." },
+    { "n": 12, "cat": "vital-presets",    "title": "Neon Pads para Vital",               "genre": "Synthwave",   "bpm": null, "key": null,      "format": "Vital .vital",          "base": 16.99, "featured": false, "summary": "Pads amplios y evolutivos con modulación por macros." },
+    { "n": 13, "cat": "midi-kits",        "title": "Melodías Tristes: MIDI Pack",        "genre": "Trap",        "bpm": 140, "key": "Varias",   "format": "Standard MIDI (.mid)",  "base": 17.99, "featured": false, "summary": "Progresiones melancólicas y toplines para trap y drill." },
+    { "n": 14, "cat": "midi-kits",        "title": "Dembow Chords MIDI",                 "genre": "Reggaetón",   "bpm": 92,  "key": "Varias",   "format": "Standard MIDI (.mid)",  "base": 15.99, "featured": false, "summary": "Acordes y bajos de reggaetón transponibles a cualquier tono." },
+    { "n": 15, "cat": "plugins",          "title": "U3M Saturator",                      "genre": null,          "bpm": null, "key": null,      "format": "VST3 / AU (Win & Mac)", "base": 39.99, "featured": true,  "summary": "Saturación analógica para 808s y voces con un solo knob." },
+    { "n": 16, "cat": "plugins",          "title": "Glide 808 Synth",                    "genre": null,          "bpm": null, "key": null,      "format": "VST3 / AU (Win & Mac)", "base": 49.99, "featured": false, "summary": "Sinte de 808 con glide, distorsión y afinación automática." },
+    { "n": 17, "cat": "daw-templates",    "title": "Plantilla FL Studio: Drill",         "genre": "Drill",       "bpm": 142, "key": "C# Minor", "format": "FL Studio (.flp)",      "base": 29.99, "featured": false, "summary": "Proyecto completo con mezcla, routing y efectos listos." },
+    { "n": 18, "cat": "daw-templates",    "title": "Plantilla Ableton: Reggaetón",       "genre": "Reggaetón",   "bpm": 94,  "key": "A Minor",  "format": "Ableton Live (.als)",   "base": 29.99, "featured": false, "summary": "Arreglo completo de reggaetón con stems y cadena de master." },
+    { "n": 19, "cat": "stems",            "title": "Voces Urbanas: Acapellas Vol. 1",    "genre": "Reggaetón",   "bpm": 96,  "key": "G Minor",  "format": "WAV (24-bit) stems",    "base": 34.99, "featured": false, "summary": "Acapellas secas y procesadas, con ad-libs incluidos." },
+    { "n": 20, "cat": "stems",            "title": "Trap Hooks: Stems",                  "genre": "Trap",        "bpm": 145, "key": "B Minor",  "format": "WAV (24-bit) stems",    "base": 27.99, "featured": false, "summary": "Hooks melódicos separados por pistas para remix." },
+    { "n": 21, "cat": "soundbanks",       "title": "Amazonía: Soundscapes",              "genre": "Ambiental",   "bpm": null, "key": null,      "format": "WAV (24-bit)",          "base": 31.99, "featured": true,  "summary": "Grabaciones de campo de la selva peruana: lluvia, río y fauna." },
+    { "n": 22, "cat": "soundbanks",       "title": "Cinematic Hits & Risers",            "genre": "Cinemático",  "bpm": null, "key": null,      "format": "WAV (24-bit)",          "base": 23.99, "featured": false, "summary": "Impactos, risers y transiciones para intros y drops." }
+  ]
+}

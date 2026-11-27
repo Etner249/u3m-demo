@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>U3M — Urbano Beat Maker (demo)</title>
-<meta name="description" content="Demo navegable de U3M, tienda de beats e instrumentales urbanos.">
+<title>U3M — Urbano Beat Maker</title>
+<meta name="description" content="Tienda de beats, drum kits, sample packs y plugins urbanos con licencias por producto.">
 <meta name="theme-color" content="#0c0c0c">
 <link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,6 +17,7 @@ html,body{margin:0}
 body{background:var(--paper);color:var(--ink);font-family:'Archivo',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
 img{max-width:100%;display:block}
 :focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .wrap{max-width:1520px;margin:0 auto;padding:0 clamp(16px,3vw,48px)}
@@ -28,7 +29,6 @@ img{max-width:100%;display:block}
 .btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#c80500}
 .btn-light{background:var(--ink);color:var(--paper)}.btn-light:hover{background:var(--red);color:#fff}
 .chip{display:inline-flex;align-items:center;border-radius:999px;padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
-.demo-banner{background:var(--red);color:#fff;text-align:center;font-weight:700;font-size:14px;padding:9px 16px}
 /* header */
 header.site{position:sticky;top:0;z-index:30;background:rgba(12,12,12,.9);backdrop-filter:blur(10px)}
 .hrow{display:flex;align-items:center;justify-content:space-between;gap:20px;height:92px}
@@ -44,13 +44,13 @@ nav.main .active{background:var(--ink);color:var(--paper)}
 .badge{position:absolute;top:2px;right:2px;min-width:18px;height:18px;border-radius:999px;background:var(--red);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;padding:0 4px}
 .menu-btn{display:none}
 .mega{position:absolute;left:0;right:0;top:100%}
+.mega[hidden]{display:none}
 .mega-inner{display:grid;grid-template-columns:1fr 1fr 290px;gap:6px;background:var(--smoke);border:1px solid var(--line);border-radius:var(--r-card);padding:14px;box-shadow:0 30px 60px rgba(0,0,0,.5)}
 .mega a.cat{padding:14px 16px;border-radius:18px;display:block}
 .mega a.cat:hover{background:var(--paper)}
 .mega a.cat b{display:block;font-size:17px}
 .mega a.cat span{display:block;color:var(--mute);font-size:14px;margin-top:3px}
-.mega .promo{grid-column:3;grid-row:1/span 6;background:var(--red);border-radius:20px;padding:24px;display:flex;flex-direction:column;justify-content:space-between}
-.mega .all{grid-column:1/span 2;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-weight:800}
+.mega .all{grid-column:1/-1;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-weight:800}
 /* hero */
 .hero{margin-top:16px;border-radius:var(--r-panel);background:#fff;color:#0c0c0c;padding:clamp(28px,5vw,64px);display:grid;grid-template-columns:1.3fr 1fr;gap:40px;align-items:center;overflow:hidden}
 .hero h1{margin:0;font-size:clamp(48px,7.4vw,112px)}
@@ -74,10 +74,11 @@ section.block{margin-top:96px}
 .card:hover{transform:translateY(-4px)}
 .cover{position:relative;border-radius:20px;overflow:hidden;aspect-ratio:1}
 .cover img{width:100%;height:100%;object-fit:cover;transition:transform .8s}
+.cover-empty{width:100%;height:100%;background:linear-gradient(135deg,#262626,#0c0c0c)}
 .card:hover .cover img{transform:scale(1.04)}
 .cover .chip{position:absolute;top:12px;left:12px;background:#0c0c0c;color:#fff}
 .cover .pbtn{position:absolute;right:12px;bottom:12px;width:56px;height:56px;border-radius:50%;border:0;background:#fff;color:#0c0c0c;display:grid;place-items:center;opacity:0;transform:translateY(6px);transition:.25s}
-.card:hover .pbtn{opacity:1;transform:none}
+.card:hover .pbtn,.pbtn[aria-pressed="true"]{opacity:1;transform:none}
 .cbody{padding:16px 8px 6px;display:flex;flex-direction:column;gap:8px;flex:1}
 .cbody .meta{color:var(--mute)}
 .cbody h3{margin:0;font-size:21px;font-weight:900;font-stretch:108%;text-transform:uppercase;line-height:1.05}
@@ -129,171 +130,47 @@ section.block{margin-top:96px}
 .ci{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
 .ci img{border-radius:14px}
 .drawer footer{padding:20px 22px;border-top:1px solid var(--line);display:grid;gap:12px}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:14px 22px;border-radius:999px;font-weight:700;z-index:80}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:14px 22px;border-radius:999px;font-weight:700;z-index:80;max-width:calc(100% - 32px)}
 footer.site{margin-top:120px}
 .fbox{border-radius:var(--r-panel);background:var(--smoke);padding:clamp(28px,4vw,56px);display:grid;grid-template-columns:5fr 2fr 2fr;gap:40px}
 .fbox h3{margin:0;font-size:clamp(32px,3.6vw,48px)}
 .fbox ul{list-style:none;padding:0;margin:0;display:grid;gap:10px;color:var(--soft)}
 .wordmark{font-size:9.4vw;white-space:nowrap;margin:40px 0 0;line-height:.8}
 .fbot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--mute);padding:22px 0;border-top:1px solid var(--line);margin-top:24px}
-@media (max-width:1100px){nav.main{display:none}.menu-btn{display:grid}.grid{grid-template-columns:repeat(2,1fr)}.grid.cat3{grid-template-columns:repeat(2,1fr)}.features{grid-template-columns:repeat(2,1fr)}.cat-layout{grid-template-columns:1fr}.side{display:none}.mega-inner{grid-template-columns:1fr}.mega .promo,.mega .all{grid-column:auto;grid-row:auto}}
-@media (max-width:760px){.hero{grid-template-columns:1fr}.grid,.grid.cat3{grid-template-columns:1fr}.features{grid-template-columns:1fr}.process{grid-template-columns:1fr}.process ol{grid-template-columns:1fr}.pd{grid-template-columns:1fr}.fbox{grid-template-columns:1fr}.hrow{height:76px}.logo img{height:42px}.hact .btn{display:none}}
 .mnav{position:fixed;inset:0;z-index:70;background:var(--paper);padding:24px;display:flex;flex-direction:column;gap:8px;overflow:auto}
 .mnav a{font-size:34px;font-weight:900;font-stretch:112%;text-transform:uppercase;padding:8px 0;border-bottom:1px solid var(--line)}
+@media (max-width:1100px){nav.main{display:none}.menu-btn{display:grid}.grid{grid-template-columns:repeat(2,1fr)}.grid.cat3{grid-template-columns:repeat(2,1fr)}.features{grid-template-columns:repeat(2,1fr)}.cat-layout{grid-template-columns:1fr !important}.side{display:none}.mega-inner{grid-template-columns:1fr}}
+@media (max-width:760px){.hero{grid-template-columns:1fr}.grid,.grid.cat3{grid-template-columns:1fr}.features{grid-template-columns:1fr}.process{grid-template-columns:1fr}.process ol{grid-template-columns:1fr}.pd{grid-template-columns:1fr}.fbox{grid-template-columns:1fr}.hrow{height:76px}.logo img{height:42px}.hact .btn{display:none}.ci{grid-template-columns:56px 1fr auto}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="demo-banner">Demo navegable · los pagos y descargas están desactivados</div>
 <header class="site" id="hdr">
   <div class="wrap hrow">
-    <button class="icon-btn menu-btn" aria-label="Abrir menú" onclick="openMenu()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button class="icon-btn menu-btn" aria-label="Abrir menú" data-action="open-menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <a href="#/" class="logo" aria-label="U3M Urbano Beat Maker, inicio"><img src="logo.png" alt="U3M Urbano Beat Maker" width="115" height="52"></a>
     <nav class="main" aria-label="Principal" id="nav"></nav>
     <div class="hact">
       <a href="#/catalogo" class="icon-btn" aria-label="Buscar en el catálogo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></a>
-      <button class="icon-btn" aria-label="Abrir carrito" onclick="openCart()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg><span class="badge" id="badge" hidden>0</span></button>
-      <button class="btn btn-red" style="height:46px;padding:0 22px" onclick="toast('Demo: el inicio de sesión está desactivado')">Entrar</button>
+      <button class="icon-btn" aria-label="Abrir carrito" data-action="open-cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg><span class="badge" id="badge" hidden>0</span></button>
+      <a class="btn btn-red" id="accountBtn" href="#" style="height:46px;padding:0 22px">Entrar</a>
     </div>
   </div>
   <div class="mega" id="mega" hidden><div class="wrap" style="padding-bottom:24px"><div class="mega-inner" id="megaInner"></div></div></div>
 </header>
-<main id="app"></main>
+<main id="app"><div class="wrap ph"><p class="note">Cargando…</p></div></main>
 <footer class="site">
   <div class="wrap">
     <div class="fbox">
       <div><h3 class="display">Herramientas sonoras<br>para gente que <span style="color:var(--red)">termina</span> canciones.</h3></div>
       <div><p class="mono" style="color:var(--mute)">Tienda</p><ul><li><a href="#/catalogo">Catálogo completo</a></li><li><a href="#/catalogo/drum-kits">Drum Kits</a></li><li><a href="#/catalogo/sample-packs">Sample Packs</a></li><li><a href="#/catalogo/plugins">Plugins</a></li></ul></div>
-      <div><p class="mono" style="color:var(--mute)">Compra</p><ul><li>Pago único</li><li>Licencia por beat</li><li>Descarga al confirmar el pago</li></ul></div>
+      <div><p class="mono" style="color:var(--mute)">Ayuda</p><ul><li><a href="#/contacto">Contacto</a></li><li><a href="#/legal/terminos">Términos y condiciones</a></li><li><a href="#/legal/privacidad">Privacidad</a></li></ul></div>
     </div>
     <p class="display wordmark" aria-hidden="true">Urbano <span style="color:var(--red)">Beat</span> Maker</p>
-    <div class="fbot mono"><span>© 2026 U3M — Urbano Beat Maker</span><span>Versión de demostración</span></div>
+    <div class="fbot mono"><span>© U3M — Urbano Beat Maker</span><span><a href="#/nosotros">Nosotros</a></span></div>
   </div>
 </footer>
 <div id="layer"></div>
-
-<script>
-const CATS=[
- {slug:'sample-packs',name:'Sample Packs',desc:'One-shots, loops y stems en 24-bit WAV',children:[{slug:'drill',name:'UK & NY Drill'},{slug:'trap',name:'Modern Trap'},{slug:'synthwave-retro',name:'Synthwave & Retro'}]},
- {slug:'drum-kits',name:'Drum Kits',desc:'808s, kicks, snares y percusiones'},
- {slug:'synth-presets',name:'Synth Presets',desc:'Soundbanks para Serum y Vital',children:[{slug:'serum-soundbanks',name:'Xfer Serum'},{slug:'vital-presets',name:'Vital'}]},
- {slug:'midi-kits',name:'MIDI & Melody Kits',desc:'Progresiones, toplines y armonías'},
- {slug:'plugins',name:'Plugins (VST / AU)',desc:'Efectos y sintes para Win y Mac'},
- {slug:'daw-templates',name:'DAW Templates',desc:'FL Studio, Ableton Live y Logic Pro'},
- {slug:'stems',name:'Stems & Acapellas',desc:'Pistas aisladas para remix'},
- {slug:'soundbanks',name:'Soundbanks',desc:'Diseño sonoro y soundscapes'},
-];
-const P=[
- ['drill','Night Shift: London Drill Kit','Drill',144,'D Minor','WAV (24-bit) + MIDI',29.99,1,'Slides de 808, hi-hats en tresillo y melodías oscuras de cuerdas.'],
- ['drill','Brooklyn Smoke Vol. 2','Drill',140,'G Minor','WAV (24-bit) + MIDI',24.99,0,'Loops de piano y coros cortados para drill neoyorquino.'],
- ['trap','Selva de Concreto: Trap Latino','Trap',136,'A Minor','WAV (24-bit) + MIDI',27.99,1,'Flautas, guitarras y percusión latina sobre baterías de trap.'],
- ['trap','Ice Cold Melodies','Trap',150,'F# Minor','WAV (24-bit)',19.99,0,'Campanas, plucks y pads fríos para trap melódico.'],
- ['synthwave-retro','Miami 1986: Retro Drums','Synthwave',108,'E Minor','WAV (24-bit)',21.99,0,'Cajas de ritmo ochenteras con reverb gated y toms electrónicos.'],
- ['synthwave-retro','Outrun Arpeggios','Synthwave',116,'C Minor','WAV + MIDI',18.99,0,'Arpegios analógicos y bajos secuenciados listos para usar.'],
- ['drum-kits','Amazonas 808 Drum Kit','Trap',null,null,'WAV (24-bit)',24.99,1,'808s afinados, kicks contundentes y percusión orgánica de la selva.'],
- ['drum-kits','Perreo Supremo: Reggaetón Drums','Reggaetón',95,null,'WAV (24-bit)',22.99,0,'Dembow, rimshots y fills listos para reggaetón y dancehall.'],
- ['serum-soundbanks','Dark Matter: Serum Bank','Electrónica',null,null,'Serum .fxp + Wavetables',26.99,0,'Bajos reese, leads distorsionados y pads oscuros con macros.'],
- ['serum-soundbanks','Latin Keys para Serum','Reggaetón',null,null,'Serum .fxp',19.99,0,'Pianos, marimbas y plucks pensados para urbano latino.'],
- ['vital-presets','Vital Essentials: Urbano','Trap',null,null,'Vital .vital',14.99,0,'808s, campanas y leads listos para Vital.'],
- ['vital-presets','Neon Pads para Vital','Synthwave',null,null,'Vital .vital',16.99,0,'Pads amplios y evolutivos con modulación por macros.'],
- ['midi-kits','Melodías Tristes: MIDI Pack','Trap',140,'Varias','Standard MIDI (.mid)',17.99,0,'Progresiones melancólicas y toplines para trap y drill.'],
- ['midi-kits','Dembow Chords MIDI','Reggaetón',92,'Varias','Standard MIDI (.mid)',15.99,0,'Acordes y bajos de reggaetón transponibles a cualquier tono.'],
- ['plugins','U3M Saturator','Herramienta',null,null,'VST3 / AU (Win & Mac)',39.99,1,'Saturación analógica para 808s y voces con un solo knob.'],
- ['plugins','Glide 808 Synth','Herramienta',null,null,'VST3 / AU (Win & Mac)',49.99,0,'Sinte de 808 con glide, distorsión y afinación automática.'],
- ['daw-templates','Plantilla FL Studio: Drill','Drill',142,'C# Minor','FL Studio (.flp)',29.99,0,'Proyecto completo con mezcla, routing y efectos listos.'],
- ['daw-templates','Plantilla Ableton: Reggaetón','Reggaetón',94,'A Minor','Ableton Live (.als)',29.99,0,'Arreglo completo de reggaetón con stems y cadena de master.'],
- ['stems','Voces Urbanas: Acapellas Vol. 1','Reggaetón',96,'G Minor','WAV (24-bit) stems',34.99,0,'Acapellas secas y procesadas, con ad-libs incluidos.'],
- ['stems','Trap Hooks: Stems','Trap',145,'B Minor','WAV (24-bit) stems',27.99,0,'Hooks melódicos separados por pistas para remix.'],
- ['soundbanks','Amazonía: Soundscapes','Ambiental',null,null,'WAV (24-bit)',31.99,1,'Grabaciones de campo de la selva peruana: lluvia, río y fauna.'],
- ['soundbanks','Cinematic Hits & Risers','Cinemático',null,null,'WAV (24-bit)',23.99,0,'Impactos, risers y transiciones para intros y drops.'],
-].map((r,i)=>({id:i+1,cat:r[0],title:r[1],genre:r[2],bpm:r[3],key:r[4],format:r[5],base:r[6],featured:!!r[7],summary:r[8],cover:`covers/cover-${String(i+1).padStart(2,'0')}.jpg`,slug:slugify(r[1])}));
-const TIERS=[{code:'BASIC',name:'Basic',mult:1,info:'Nivel de entrada'},{code:'PRO',name:'Pro',mult:2.5,info:'Nivel intermedio'},{code:'UNLIMITED',name:'Unlimited',mult:4,info:'Nivel más amplio'}];
-function slugify(s){return s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/&/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
-function tierPrice(p,t){return Math.round(p.base*t.mult)-0.01}
-const fmt=n=>n.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})+' US$';
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const catName=slug=>{for(const c of CATS){if(c.slug===slug)return c.name;for(const k of c.children||[])if(k.slug===slug)return k.name}return slug};
-const inCat=(p,slug)=>{if(!slug)return true;if(p.cat===slug)return true;const c=CATS.find(c=>c.slug===slug);return !!(c&&c.children&&c.children.some(k=>k.slug===p.cat))};
-const meta=p=>[p.format.split(/[+(]/)[0].trim(),p.genre,p.bpm?p.bpm+' BPM':null,p.key].filter(Boolean).join(' / ');
-let cart=[];try{cart=JSON.parse(localStorage.getItem('u3m-demo-cart')||'[]')}catch(e){}
-function saveCart(){try{localStorage.setItem('u3m-demo-cart',JSON.stringify(cart))}catch(e){}const b=document.getElementById('badge');b.hidden=!cart.length;b.textContent=cart.length}
-const I={play:'<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>',arrow:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',close:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',chev:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'};
-
-function card(p){return `<article class="card" onclick="location.hash='#/producto/${p.slug}'">
- <div class="cover"><img src="${p.cover}" alt="${esc(p.title)}" loading="lazy" width="500" height="500"><span class="chip">${esc(catName(p.cat))}</span>
- <button class="pbtn" aria-label="Escuchar muestra de ${esc(p.title)}" onclick="event.stopPropagation();toast('Demo: las muestras de audio están desactivadas')">${I.play}</button></div>
- <div class="cbody"><p class="mono meta" style="margin:0">${esc(meta(p))}</p><h3>${esc(p.title)}</h3>
- <div class="cfoot"><div class="price"><small>Desde</small>${fmt(tierPrice(p,TIERS[0]))}</div><a class="btn btn-light" href="#/producto/${p.slug}" onclick="event.stopPropagation()">Elegir licencia</a></div></div></article>`}
-
-function home(){const f=P.filter(p=>p.featured),hp=f[0];
- return `<div class="wrap">
- <section class="hero" aria-labelledby="ht"><div>
-  <p class="mono" style="color:#555;margin:0 0 20px">Instrumentales con licencia por nivel</p>
-  <h1 id="ht" class="display">Beats que<br><span style="color:var(--red)">rompen</span> calle.</h1>
-  <span class="bar" style="margin:28px 0"></span>
-  <p class="lead">Compra una vez, descárgalos al confirmar el pago y úsalos en cada lanzamiento.</p>
-  <div style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn-dark" href="#/catalogo">Explorar catálogo ${I.arrow}</a><a class="btn btn-red" href="#/catalogo/drum-kits">Ver Drum Kits</a></div></div>
-  <div class="hero-art"><svg viewBox="0 0 400 400" width="100%" height="100%" aria-hidden="true"><circle cx="200" cy="200" r="190" fill="none" stroke="#0c0c0c" stroke-width="1.5" opacity=".2"/><circle cx="200" cy="200" r="150" fill="none" stroke="#0c0c0c" stroke-width="1.5" opacity=".35"/><circle cx="200" cy="200" r="110" fill="none" stroke="#0c0c0c" stroke-width="1.5" opacity=".55"/><circle cx="200" cy="200" r="70" fill="#0c0c0c"/><circle cx="200" cy="200" r="24" fill="#e10600"/><path d="M60 300 C 120 220, 150 330, 210 250 S 300 170, 350 120" fill="none" stroke="#e10600" stroke-width="6" stroke-linecap="round"/></svg>
-  <a class="np" href="#/producto/${hp.slug}"><span class="play">${I.play}</span><span style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(hp.title)}</b><span class="mono" style="color:rgba(255,255,255,.7)">${hp.bpm} BPM · ${esc(hp.key)}</span></span></a></div>
- </section>
- <ul class="features" style="padding:0" aria-label="Ventajas"><li><b>Descarga tras el pago</b><span>Enlaces temporales al confirmar la compra.</span></li><li><b>Licencias por beat</b><span>Cada beat ofrece sus niveles.</span></li><li><b>Formato por archivo</b><span>Según la ficha de cada producto.</span></li><li><b>Updates de por vida</b><span>Nuevas versiones sin coste.</span></li><li class="hot"><b>Pago único</b><span>Sin suscripciones.</span></li></ul>
- <section class="block"><div class="sh"><div><h2 class="display">Destacados</h2><span class="bar"></span></div><a href="#/catalogo">Ver todo →</a></div><div class="grid">${f.slice(0,4).map(card).join('')}</div></section>
- <section class="block"><div class="sh"><div><h2 class="display">Por <span style="color:var(--red)">categoría</span></h2><span class="bar"></span></div></div><div class="pills">${CATS.map((c,i)=>`<a href="#/catalogo/${c.slug}" class="${i?'':'first'}">${esc(c.name)}</a>`).join('')}</div></section>
- <section class="block process"><h2 class="display" style="margin:0;font-size:clamp(36px,4.6vw,56px)">Compra hoy.<br>Tuyo <span style="color:var(--red)">para siempre.</span></h2>
-  <ol><li><span class="mono" style="color:var(--red2)">Paso 01</span><b class="display" style="font-size:30px">Escucha</b><span class="note">Reproduce las muestras antes de decidir.</span></li><li><span class="mono" style="color:var(--red2)">Paso 02</span><b class="display" style="font-size:30px">Compra</b><span class="note">Pago único. Aplica tu cupón en el carrito.</span></li><li><span class="mono" style="color:var(--red2)">Paso 03</span><b class="display" style="font-size:30px">Descarga</b><span class="note">Todo queda en tu biblioteca.</span></li></ol></section>
- <section class="block"><div class="sh"><div><h2 class="display">Novedades</h2><span class="bar"></span></div><a href="#/catalogo">Catálogo →</a></div><div class="grid">${P.filter(p=>!p.featured).slice(0,8).map(card).join('')}</div></section>
- </div>`}
-
-let q='';
-function catalog(slug){const list=P.filter(p=>inCat(p,slug)&&(!q||(p.title+' '+p.genre+' '+p.format).toLowerCase().includes(q.toLowerCase())));
- const side=`<a href="#/catalogo" class="${slug?'':'on'}">Todo el catálogo</a>`+CATS.map(c=>`<a href="#/catalogo/${c.slug}" class="${slug===c.slug?'on':''}">${esc(c.name)}</a>`+(c.children||[]).map(k=>`<a class="sub ${slug===k.slug?'on':''}" href="#/catalogo/${k.slug}">${esc(k.name)}</a>`).join('')).join('');
- return `<div class="wrap"><div class="ph"><p class="mono" style="color:var(--mute)">Inicio / Catálogo${slug?' / '+esc(catName(slug)):''}</p><h1 class="display">${slug?esc(catName(slug)):'Catálogo'}</h1><span class="bar"></span></div>
- <div class="cat-layout"><aside class="side"><h4 class="mono" style="color:var(--mute)">Categoría</h4>${side}</aside>
- <div><label class="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr" hidden>Buscar</span><input id="q" type="search" placeholder="Buscar por título, estilo o formato" value="${esc(q)}" aria-label="Buscar"></label>
- <p class="mono" style="color:var(--mute);margin:0 0 20px">${list.length} resultado${list.length===1?'':'s'}</p>
- ${list.length?`<div class="grid cat3">${list.map(card).join('')}</div>`:`<div class="empty"><h2 class="display" style="margin:0 0 10px;font-size:40px">Nada por aquí</h2><p class="note">Prueba con otra búsqueda o categoría.</p></div>`}</div></div></div>`}
-
-function product(slug){const p=P.find(x=>x.slug===slug);if(!p)return `<div class="wrap ph"><h1 class="display">No encontrado</h1><p><a class="btn btn-light" href="#/catalogo">Ir al catálogo</a></p></div>`;
- const rel=P.filter(x=>x.cat===p.cat&&x.id!==p.id).concat(P.filter(x=>x.cat!==p.cat&&x.featured)).slice(0,4);
- return `<div class="wrap"><p class="mono" style="color:var(--mute);margin-top:36px"><a href="#/">Inicio</a> / <a href="#/catalogo/${p.cat}">${esc(catName(p.cat))}</a> / ${esc(p.title)}</p>
- <div class="pd"><div class="cover"><img src="${p.cover}" alt="${esc(p.title)}" width="1000" height="1000"></div>
- <div><span class="chip" style="background:var(--smoke)">${esc(catName(p.cat))}</span><h1 class="display">${esc(p.title)}</h1><span class="bar" style="width:96px;margin-top:18px"></span>
- <p style="font-size:19px;line-height:1.55;color:var(--soft);margin:22px 0 0">${esc(p.summary)}</p>
- <div class="specs"><div><span class="mono">Formato</span><b>${esc(p.format.split(/[+(]/)[0].trim())}</b></div><div><span class="mono">BPM</span><b>${p.bpm||'—'}</b></div><div><span class="mono">Tono</span><b>${esc(p.key||'—')}</b></div></div>
- <h2 class="mono" style="color:var(--mute);margin:28px 0 0">Elige tu licencia</h2>
- <div class="lic" role="radiogroup">${TIERS.map((t,i)=>`<div><input type="radio" name="lic" id="l${i}" value="${t.code}" ${i?'':'checked'}><label for="l${i}"><span><b>${t.name}</b><small>${t.info}</small></span><span class="lp">${fmt(tierPrice(p,t))}</span></label></div>`).join('')}</div>
- <div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-red" onclick="addToCart(${p.id})">Añadir al carrito</button><button class="btn btn-light" onclick="toast('Demo: las muestras de audio están desactivadas')">${I.play} Escuchar muestra</button></div>
- <p class="note" style="margin-top:18px">Producto de demostración: los términos de cada licencia se muestran en la tienda real antes de comprar.</p></div></div>
- <section class="block"><div class="sh"><div><h2 class="display">También te puede gustar</h2><span class="bar"></span></div></div><div class="grid">${rel.map(card).join('')}</div></section></div>`}
-
-function addToCart(id){const code=(document.querySelector('input[name=lic]:checked')||{}).value||'BASIC';const p=P.find(x=>x.id===id);cart=cart.filter(c=>c.id!==id);cart.push({id,code});saveCart();toast(`Añadido: ${p.title} (${TIERS.find(t=>t.code===code).name})`);openCart()}
-function openCart(){const items=cart.map(c=>({c,p:P.find(x=>x.id===c.id),t:TIERS.find(t=>t.code===c.code)})).filter(x=>x.p);const total=items.reduce((s,x)=>s+tierPrice(x.p,x.t),0);
- layer(`<div class="overlay" onclick="closeLayer()"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Carrito"><header><h2 class="display" style="margin:0;font-size:34px">Carrito</h2><button class="icon-btn" aria-label="Cerrar" onclick="closeLayer()">${I.close}</button></header>
- <div class="items">${items.length?items.map(x=>`<div class="ci"><img src="${x.p.cover}" alt="" width="64" height="64"><div><b>${esc(x.p.title)}</b><p class="mono" style="color:var(--mute);margin:4px 0 0">Licencia ${x.t.name}</p></div><div style="text-align:right"><b>${fmt(tierPrice(x.p,x.t))}</b><br><button style="background:none;border:0;color:var(--red2);font-weight:700;padding:6px 0" onclick="removeItem(${x.p.id})">Quitar</button></div></div>`).join(''):'<p class="note" style="padding:20px 0">Tu carrito está vacío.</p>'}</div>
- <footer><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="mono" style="color:var(--mute)">Total</span><b class="display" style="font-size:32px">${fmt(total)}</b></div><button class="btn btn-red" style="justify-content:center" onclick="toast('Demo: el pago está desactivado')">Ir a pagar</button></footer></aside>`)}
-function removeItem(id){cart=cart.filter(c=>c.id!==id);saveCart();openCart()}
-function openMenu(){layer(`<nav class="mnav" aria-label="Menú"><button class="icon-btn" style="align-self:flex-end" aria-label="Cerrar menú" onclick="closeLayer()">${I.close}</button><a href="#/" onclick="closeLayer()">Inicio</a><a href="#/catalogo" onclick="closeLayer()">Catálogo</a>${CATS.map(c=>`<a href="#/catalogo/${c.slug}" onclick="closeLayer()" style="font-size:22px">${esc(c.name)}</a>`).join('')}</nav>`)}
-function layer(h){document.getElementById('layer').innerHTML=h;document.body.style.overflow='hidden'}
-function closeLayer(){document.getElementById('layer').innerHTML='';document.body.style.overflow=''}
-let tt;function toast(m){let el=document.querySelector('.toast');if(!el){el=document.createElement('div');el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=m;clearTimeout(tt);tt=setTimeout(()=>el.remove(),2600)}
-
-let megaOpen=false;
-function renderNav(route){const links=[['#/','Inicio',route==='home'],['#/catalogo','Catálogo',route==='catalog']];
- document.getElementById('nav').innerHTML=links.map(([h,l,a],i)=>`<a href="${h}" class="${a&&!megaOpen?'active':''}">${l}</a>`+(i===1?`<button aria-expanded="${megaOpen}" aria-controls="mega" class="${megaOpen?'active':''}" onclick="toggleMega()">Categorías ${I.chev}</button>`:'')).join('')+`<a href="#/catalogo/drum-kits"><span class="dot"></span>Drum Kits</a><a href="#/catalogo/plugins">Plugins</a>`;
- document.getElementById('megaInner').innerHTML=CATS.map(c=>`<a class="cat" href="#/catalogo/${c.slug}"><b>${esc(c.name)}</b><span>${esc(c.desc)}</span></a>`).join('')+`<a class="promo" href="#/catalogo/soundbanks"><span class="mono">Nuevo</span><span><b class="display" style="display:block;font-size:30px">Amazonía: Soundscapes</b><span class="btn" style="background:#fff;color:#0c0c0c;height:44px;margin-top:14px">Ver ${I.arrow}</span></span></a><a class="cat all" href="#/catalogo"><span>Ver todo el catálogo</span><span style="color:var(--red2)">→</span></a>`;
- document.getElementById('mega').hidden=!megaOpen}
-function toggleMega(){megaOpen=!megaOpen;renderNav(curRoute)}
-document.addEventListener('pointerdown',e=>{if(megaOpen&&!document.getElementById('hdr').contains(e.target)){megaOpen=false;renderNav(curRoute)}});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(megaOpen){megaOpen=false;renderNav(curRoute)}closeLayer()}});
-
-let curRoute='home';
-function router(){const h=location.hash.replace(/^#\/?/,'').split('/');let html;megaOpen=false;
- if(h[0]==='catalogo'){curRoute='catalog';html=catalog(h[1]||'')}else if(h[0]==='producto'){curRoute='product';html=product(h[1])}else{curRoute='home';html=home()}
- document.getElementById('app').innerHTML=html;renderNav(curRoute);window.scrollTo(0,0);
- const qi=document.getElementById('q');if(qi)qi.addEventListener('input',e=>{q=e.target.value;const pos=e.target.selectionStart;document.getElementById('app').innerHTML=catalog(h[1]||'');const n=document.getElementById('q');n.focus();n.setSelectionRange(pos,pos);rebindSearch(h[1]||'')});
- document.title=(curRoute==='home'?'':(curRoute==='catalog'?'Catálogo':'Producto')+' — ')+'U3M — Urbano Beat Maker (demo)'}
-function rebindSearch(slug){const qi=document.getElementById('q');qi.addEventListener('input',e=>{q=e.target.value;const pos=e.target.selectionStart;document.getElementById('app').innerHTML=catalog(slug);const n=document.getElementById('q');n.focus();n.setSelectionRange(pos,pos);rebindSearch(slug)})}
-window.addEventListener('hashchange',router);saveCart();router();
-</script>
+<script type="module" src="assets/js/app.js"></script>
 </body>
 </html>

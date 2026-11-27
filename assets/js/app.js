@@ -302,9 +302,10 @@ function viewProduct(slug) {
 
 function viewContact() {
   const c = state.settings.contact ?? {};
+  const hasInfo = !!(c.email || c.phone || c.hours);
   const f = 'width:100%;height:52px;border-radius:16px;border:0;background:var(--paper);color:var(--ink);padding:0 16px;font:inherit;margin-top:8px';
   return `<div class="wrap"><div class="ph"><p class="mono" style="color:var(--mute)">Inicio / Contacto</p><h1 class="display">Hablemos.</h1><span class="bar"></span></div>
-  <div style="display:grid;gap:32px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin:48px 0 96px">
+  <div style="display:grid;gap:32px;grid-template-columns:${hasInfo ? "minmax(0,1.3fr) minmax(0,1fr)" : "minmax(0,1fr)"};margin:48px 0 96px">
     <form data-form="contact" style="background:var(--smoke);border-radius:28px;padding:clamp(24px,4vw,44px);display:grid;gap:18px">
       <label class="mono" style="color:var(--mute)">Tu nombre<input name="name" required maxlength="120" style="${f}"></label>
       <label class="mono" style="color:var(--mute)">Tu correo<input name="email" type="email" required maxlength="200" style="${f}"></label>
@@ -313,11 +314,11 @@ function viewContact() {
       <button class="btn btn-red" type="submit" style="justify-self:start">Enviar mensaje</button>
       <p class="msg mono" data-msg hidden style="color:var(--red)"></p>
     </form>
-    <aside style="display:grid;gap:20px;align-content:start">
+    ${hasInfo ? `<aside style="display:grid;gap:20px;align-content:start">
       ${c.email ? `<div style="border:1px solid var(--line2);border-radius:20px;padding:24px"><p class="mono" style="color:var(--mute)">Correo</p><p class="display" style="font-size:26px;margin:10px 0 0"><a href="mailto:${esc(c.email)}" style="color:inherit">${esc(c.email)}</a></p></div>` : ""}
       ${c.phone ? `<div style="border:1px solid var(--line2);border-radius:20px;padding:24px"><p class="mono" style="color:var(--mute)">Teléfono / WhatsApp</p><p class="display" style="font-size:26px;margin:10px 0 0">${esc(c.phone)}</p></div>` : ""}
       ${c.hours ? `<div style="border:1px solid var(--line2);border-radius:20px;padding:24px"><p class="mono" style="color:var(--mute)">Horario de atención</p><p style="font-size:18px;margin:10px 0 0">${esc(c.hours)}</p></div>` : ""}
-    </aside></div></div>`;
+    </aside>` : ""}</div></div>`;
 }
 
 function viewAbout() {

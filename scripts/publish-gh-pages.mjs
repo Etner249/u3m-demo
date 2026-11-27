@@ -16,6 +16,8 @@ const PUBLIC_KEY = "sb_publishable_5TCys0ypAs6wNiNHtqZnQg__j5PJeLo"; // clave pu
 const BACKUP = "backup/gh-pages-2026-11-27";
 const PUBLIC_URL = "https://etner249.github.io/u3m-demo/";
 const dryRun = process.argv.includes("--dry-run");
+// Solo por decisión explícita del propietario: publicar con el catálogo todavía vacío.
+const allowEmptyCatalog = process.argv.includes("--allow-empty-catalog");
 
 const sh = (cmd, opts = {}) => execSync(cmd, { cwd: ROOT, stdio: opts.quiet ? "pipe" : "inherit", encoding: "utf8", ...opts }).trim();
 const fail = (m) => { console.error("\nNO PUBLICADO: " + m); process.exit(1); };
@@ -25,7 +27,7 @@ const pm = await fetch(`${BASE}/settings?key=eq.payment_methods&select=value`, {
 if (pm?.[0]?.value?.paypal !== false) fail("PayPal está activado. Debe permanecer desactivado hasta tener credenciales.");
 const prods = await fetch(`${BASE}/products?status=eq.published&select=id`, { headers: { apikey: PUBLIC_KEY, Prefer: "count=exact", Range: "0-99" } });
 const total = Number((prods.headers.get("content-range") ?? "*/0").split("/")[1]);
-if (total !== 22) fail(`Hay ${total} productos publicados; se requieren 22.`);
+if (total !== 22 && !(allowEmptyCatalog && total === 0)) fail(`Hay ${total} productos publicados; se requieren 22 (o usa --allow-empty-catalog si el catálogo aún está en preparación).`);
 sh(`git rev-parse --verify --quiet origin/${BACKUP} || git rev-parse --verify --quiet ${BACKUP}`, { quiet: true });
 console.log(`ok  PayPal desactivado · Yape en modo manual · ${total} productos publicados`);
 

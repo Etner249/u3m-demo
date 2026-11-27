@@ -160,7 +160,7 @@ function card(p) {
 }
 
 function grid(list, cls = "grid") {
-  return list.length ? `<div class="${cls}">${list.map(card).join("")}</div>` : emptyBox("Nada por aquí", "Aún no hay productos publicados en esta sección.");
+  return list.length ? `<div class="${cls}">${list.map(card).join("")}</div>` : (state.products.length ? emptyBox("Nada por aquí", "Prueba con otra búsqueda o categoría.") : emptyBox("Catálogo en preparación", "Los productos se publicarán muy pronto. Mientras tanto, puedes visitar Nosotros o Contacto."));
 }
 
 function emptyBox(title, text) {
